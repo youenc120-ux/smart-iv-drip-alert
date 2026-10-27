@@ -1,9 +1,11 @@
 # 智慧點滴注射預警系統 Smart IV Drip Alert
 
 以 ESP32 搭配上、下兩組非接觸式紅外線液位感測器，雙階段偵測點滴袋剩餘液量，
-透過蜂鳴器、LED、手機網頁與推播通知（ntfy / Telegram）即時提醒醫護人員更換點滴。
+透過蜂鳴器、LED、手機網頁與**網頁推播**即時提醒醫護人員更換點滴。
+推播由 ESP32 直接加密送到 Apple / Google 的推播服務，不經過任何第三方通知平台。
 
-**👉 [手機監控網頁線上展示](https://youenc120-ux.github.io/smart-iv-drip-alert/)**（展示模式，下方按鈕可切換模擬狀態）
+- **[點滴警報推播 App](https://youenc120-ux.github.io/smart-iv-drip-alert/)**：加入 iPhone 主畫面即可接收推播（[展示畫面](https://youenc120-ux.github.io/smart-iv-drip-alert/?demo)）
+- **[裝置監控頁展示](https://youenc120-ux.github.io/smart-iv-drip-alert/device.html)**：ESP32 內建的即時監控頁面（展示模式）
 
 > ⚠️ 本專案為學生專題原型，僅供教學與研究，**不是醫療器材**，未經任何醫療認證，請勿用於實際病患照護。測試請使用清水。
 
@@ -53,12 +55,20 @@ Power LED：  3V3    → 330Ω → LED → GND
 5. 校正：序列埠每秒顯示感測器電位，對照「有液 / 無液」調整 TCRT5000 上的可調電阻，
    並設定程式中的 `LIQUID_LEVEL`
 
-### 手機推播設定
+### 手機推播設定（網頁推播）
 
-- **ntfy**（最簡單）：手機安裝 ntfy App，訂閱一個自訂主題（例如 `iv-301a-k7m2q9`），
-  把同一個名稱填入 `secrets.h` 的 `NTFY_TOPIC`。主題名稱等於密碼，請取別人猜不到的。
-- **Telegram**：向 @BotFather 建立機器人取得 Token，填入 `TG_TOKEN` 與 `TG_CHAT_ID`。
+1. 第一次使用先執行 `make_vapid.ps1` 產生推播金鑰（私鑰寫入 `secrets.h`，公鑰寫入 `docs/config.js`），再燒錄
+   > 如果你 fork 這個專案，需要把 `docs/config.js` 一起推上自己的 GitHub Pages
+2. iPhone（iOS 16.4 以上）用 Safari 開啟 [推播 App](https://youenc120-ux.github.io/smart-iv-drip-alert/)，
+   「分享 → 加入主畫面」，再從主畫面開啟（Android 用 Chrome 直接開啟即可）
+3. 按「開啟推播」並允許通知
+4. 手機與 ESP32 連上同一個 Wi-Fi，輸入裝置位址按「連結」，會跳到裝置頁面完成綁定並收到一則測試通知
 
+運作方式：推播 App（HTTPS）向瀏覽器取得推播訂閱 → 跳轉到 ESP32 的 `/pair` 頁面交給裝置保存 →
+液位變化時 ESP32 依 RFC 8291 加密內容、以 VAPID（RFC 8292）簽章，直接送到手機的推播服務。
+每台裝置最多綁定 10 支手機，資料存在快閃記憶體，斷電不會消失。
+
+- **Telegram**（選用）：向 @BotFather 建立機器人取得 Token，填入 `secrets.h` 的 `TG_TOKEN` 與 `TG_CHAT_ID`
 ## 手機 App
 
 [`app/`](app/) 資料夾是用 Flutter 撰寫的 Android / iOS 雙平台 App：多床同時監看、系統通知、
@@ -71,15 +81,20 @@ Power LED：  3V3    → 330Ω → LED → GND
 | `SmartIVDrip.ino` | ESP32 主程式 |
 | `phone.html` | 手機監控網頁原始檔（直接用瀏覽器開啟即為展示模式） |
 | `index_html.h` | 由 `make_html.ps1` 自動產生，燒錄用的網頁內容 |
-| `make_html.ps1` | 修改 `phone.html` 後執行，更新 `index_html.h` 與 `docs/index.html` |
+| `webpush.h` | 網頁推播：加密（RFC 8291）與 VAPID 簽章（RFC 8292） |
+| `pair_html.h` | 手機綁定推播用的配對頁 |
+| `make_vapid.ps1` | 產生推播金鑰 |
+| `make_html.ps1` | 修改 `phone.html` 後執行，更新 `index_html.h` 與 `docs/device.html` |
 | `secrets.example.h` | 個人設定範本 |
-| `docs/` | GitHub Pages 線上展示 |
+| `docs/` | GitHub Pages：推播 App（`index.html`、`sw.js`）與裝置頁展示 |
 
 ## 已知限制
 
 - 兩個開關式感測器只能分辨三段液位，無法量測確切剩餘毫升數
-- 手機網頁需開著才會發出聲音；鎖定螢幕請搭配 ntfy 或 Telegram 推播
+- 裝置監控頁需開著才會發出聲音；鎖定螢幕請使用推播 App
 - 熱點模式沒有網際網路，無法推播
+- 推播 App 只顯示收到的推播，無法得知裝置是否斷線（裝置監控頁可以）
+- 任何連上同一個 Wi-Fi 的人都能綁定裝置（原型簡化）
 - 推播使用 HTTPS 但未驗證伺服器憑證（原型簡化）
 
 ## 授權

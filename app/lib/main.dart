@@ -484,7 +484,7 @@ void showSettings(BuildContext context, Monitor monitor) {
               leading: Icon(Icons.info_outline),
               title: Text('使用須知'),
               subtitle: Text('App 開著時才會持續監測。長時間背景執行時，'
-                  '系統可能暫停 App，請搭配裝置的 ntfy / Telegram 推播。\n'
+                  '系統可能暫停 App，請搭配網頁推播。\n'
                   '本系統為專題原型，非醫療器材。'),
             ),
           ],

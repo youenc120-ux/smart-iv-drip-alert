@@ -44,6 +44,12 @@ button{font:inherit;border:0;border-radius:12px;padding:14px;width:100%;font-siz
 button:disabled{opacity:.4;cursor:default}
 .mute{background:var(--ink);color:var(--card)}
 .sound{background:var(--line);color:var(--ink);margin-top:8px}
+button,.link{display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px}
+.link{border-radius:12px;padding:14px;font-size:16px;font-weight:600;text-decoration:none;box-sizing:border-box}
+.ic{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.push h2{margin-bottom:4px}
+.push .link{margin-top:12px}
+@media (prefers-reduced-motion:reduce){.empty{animation:none}#fill{transition:none}}
 .log{list-style:none;margin:0;padding:0;max-height:240px;overflow:auto}
 .log li{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
 .log li:last-child{border:0}
@@ -95,8 +101,20 @@ button:disabled{opacity:.4;cursor:default}
   </div>
 
   <div class="card">
-    <button class="mute" id="muteBtn" onclick="mute()" disabled>🔕 靜音現場警報</button>
-    <button class="sound" id="soundBtn" onclick="enableSound()">🔔 開啟手機提示音</button>
+    <button class="mute" id="muteBtn" onclick="mute()" disabled>
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m2 2 20 20"/></svg>
+      靜音現場警報</button>
+    <button class="sound" id="soundBtn" onclick="enableSound()">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.4 18.4a9 9 0 0 0 0-12.7"/></svg>
+      <span id="soundText">開啟這頁的提示音</span></button>
+  </div>
+
+  <div class="card push">
+    <h2>手機推播</h2>
+    <p class="sub" id="pushInfo">手機鎖定時也能收到警報。</p>
+    <a class="sound link" href="https://youenc120-ux.github.io/smart-iv-drip-alert/" target="_blank" rel="noopener">
+      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      設定推播（開啟點滴警報 App）</a>
   </div>
 
   <div class="card">
@@ -133,7 +151,7 @@ function enableSound() {
   ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
   ctx.resume();
   beep(1);
-  $('soundBtn').textContent = '🔔 手機提示音已開啟';
+  $('soundText').textContent = '這頁的提示音已開啟';
   $('soundBtn').disabled = true;
 }
 function beep(n, f = 1000) {
@@ -189,6 +207,7 @@ function render(d) {
   sensor($('l'), d.lower);
   $('m').textContent = d.muted ? '靜音中 ' + d.muteLeft + ' 秒' : (d.state === 'normal' ? '待命' : '警報中');
   $('muteBtn').disabled = d.state === 'normal' || d.muted;
+  $('pushInfo').textContent = d.push ? '已綁定 ' + d.push + ' 支手機，警報會即時推播。' : '尚未綁定手機。手機鎖定時也能收到警報。';
   document.title = (d.state === 'empty' ? '🔴 ' : d.state === 'low' ? '🟡 ' : '') + '點滴監控';
 
   if (d.state !== last) {
