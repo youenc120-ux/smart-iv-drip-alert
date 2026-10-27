@@ -1,0 +1,8 @@
+# 個人設定（Wi-Fi 密碼、推播金鑰），絕對不要上傳
+secrets.h
+
+# 編譯產物
+build/
+*.bin
+*.elf
+*.map
