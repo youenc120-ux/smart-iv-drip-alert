@@ -5,18 +5,20 @@ $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $dir
 $utf8 = New-Object System.Text.UTF8Encoding $false
 
-function Patch($path, [scriptblock]$fn) {
-    if (-not (Test-Path $path)) { Write-Host "找不到 $path，略過"; return }
+# 路徑一律用 /，Windows 與 Mac 都能用；.NET 讀檔需要完整路徑
+function Patch($rel, [scriptblock]$fn) {
+    $path = Join-Path $dir $rel
+    if (-not (Test-Path $path)) { Write-Host "找不到 $rel，略過"; return }
     $s = [IO.File]::ReadAllText($path)
     $n = & $fn $s
     if ($n -ne $s) { [IO.File]::WriteAllText($path, $n, $utf8); Write-Host "已修改 $path" }
 }
 
 flutter create --org io.github.youenc120ux --project-name iv_drip_monitor --platforms android,ios .
-Remove-Item -ErrorAction SilentlyContinue test\widget_test.dart
+Remove-Item -ErrorAction SilentlyContinue (Join-Path $dir 'test/widget_test.dart')
 
 # Android：網路、通知權限、允許連線區域網路的 HTTP（ESP32 沒有 HTTPS）
-Patch 'android\app\src\main\AndroidManifest.xml' {
+Patch 'android/app/src/main/AndroidManifest.xml' {
     param($s)
     if ($s -match 'usesCleartextTraffic') { return $s }
     $perm = "    <uses-permission android:name=`"android.permission.INTERNET`"/>`n" +
@@ -27,13 +29,13 @@ Patch 'android\app\src\main\AndroidManifest.xml' {
 }
 
 # Android：flutter_local_notifications 需要 core library desugaring
-Patch 'android\app\build.gradle.kts' {
+Patch 'android/app/build.gradle.kts' {
     param($s)
     if ($s -match 'desugar') { return $s }
     $s = ([regex]'compileOptions \{').Replace($s, "compileOptions {`n        isCoreLibraryDesugaringEnabled = true", 1)
     $s + "`ndependencies {`n    coreLibraryDesugaring(`"com.android.tools:desugar_jdk_libs:2.1.4`")`n}`n"
 }
-Patch 'android\app\build.gradle' {
+Patch 'android/app/build.gradle' {
     param($s)
     if ($s -match 'desugar') { return $s }
     $s = ([regex]'compileOptions \{').Replace($s, "compileOptions {`n        coreLibraryDesugaringEnabled true", 1)
@@ -41,7 +43,7 @@ Patch 'android\app\build.gradle' {
 }
 
 # iOS：允許連線區域網路、App 名稱
-Patch 'ios\Runner\Info.plist' {
+Patch 'ios/Runner/Info.plist' {
     param($s)
     if ($s -match 'NSAllowsLocalNetworking') { return $s }
     $add = "`t<key>NSAppTransportSecurity</key>`n`t<dict>`n`t`t<key>NSAllowsLocalNetworking</key>`n`t`t<true/>`n`t</dict>`n" +
@@ -51,7 +53,7 @@ Patch 'ios\Runner\Info.plist' {
 }
 
 # iOS：App 開著時也顯示通知
-Patch 'ios\Runner\AppDelegate.swift' {
+Patch 'ios/Runner/AppDelegate.swift' {
     param($s)
     if ($s -match 'UNUserNotificationCenter') { return $s }
     $s = $s -replace 'import Flutter', "import Flutter`nimport UserNotifications"

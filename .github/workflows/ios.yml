@@ -1,0 +1,44 @@
+# 在 GitHub 的雲端 Mac 上建置 iPhone App（公開專案免費）
+# 產生未簽署的 .ipa，可用 Sideloadly 等工具以自己的 Apple ID 簽署安裝
+name: Build iOS App
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: 產生 iOS 專案並套用設定
+        shell: pwsh
+        run: ./setup.ps1
+
+      - name: 程式碼檢查
+        run: flutter analyze --no-fatal-infos
+
+      - name: 建置 iOS（未簽署）
+        run: flutter build ios --release --no-codesign
+
+      - name: 打包 IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qr IVDripMonitor-unsigned.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IVDripMonitor-unsigned-ipa
+          path: app/IVDripMonitor-unsigned.ipa
