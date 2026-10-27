@@ -59,6 +59,11 @@ Power LED：  3V3    → 330Ω → LED → GND
   把同一個名稱填入 `secrets.h` 的 `NTFY_TOPIC`。主題名稱等於密碼，請取別人猜不到的。
 - **Telegram**：向 @BotFather 建立機器人取得 Token，填入 `TG_TOKEN` 與 `TG_CHAT_ID`。
 
+## 手機 App
+
+[`app/`](app/) 資料夾是用 Flutter 撰寫的 Android / iOS 雙平台 App：多床同時監看、系統通知、
+第二階段鬧鐘音量響鈴、一鍵確認靜音。建置方式見 [app/README.md](app/README.md)。
+
 ## 檔案說明
 
 | 檔案 | 說明 |
