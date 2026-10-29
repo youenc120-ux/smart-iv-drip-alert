@@ -5,147 +5,243 @@ const char INDEX_HTML[] PROGMEM = R"HTML(<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1565c0">
+<meta name="theme-color" content="#f4f6fa">
 <title>點滴監控</title>
 <style>
-:root{--bg:#eef2f7;--card:#fff;--ink:#1c2430;--sub:#6b7685;--line:#e6eaf0;--blue:#1565c0;--ok:#2e9d5b;--warn:#e09400;--bad:#d63031;--fault:#6c5ce7;--off:#8a94a3;--liq:#7fb8f0}
-@media (prefers-color-scheme:dark){:root{--bg:#0f141b;--card:#1a212b;--ink:#e8edf3;--sub:#9aa5b3;--line:#2a3340;--liq:#4a8fd6}}
+:root{
+  --bg:#f4f6fa;--surface:#fff;--ink:#16202c;--sub:#5d6878;--line:#e4e8ee;--blue:#1565c0;--blue-soft:#e6effb;
+  --ok:#1f9d55;--ok-ink:#17803f;--warn:#d98a00;--warn-ink:#8a5a00;--bad:#d92d20;--bad-ink:#b42318;
+  --fault:#6e56cf;--fault-ink:#5a43b8;--off:#8a94a3;--off-ink:#5d6878;--liquid:#7cb6f2;--shadow:0 1px 2px #0000000d,0 4px 16px #00000010
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0e131a;--surface:#18202a;--ink:#e9eef4;--sub:#9aa6b4;--line:#28323f;--blue:#7fb2f5;--blue-soft:#1b2a3d;
+  --ok-ink:#5fd08f;--warn-ink:#f2b84b;--bad-ink:#ff8a80;--fault-ink:#b4a6ff;--off-ink:#9aa6b4;--liquid:#3f86d6;--shadow:none
+}}
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,"Noto Sans TC","Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--ink);-webkit-tap-highlight-color:transparent}
-header{position:sticky;top:0;z-index:2;background:var(--blue);color:#fff;padding:14px 16px;padding-top:max(14px,env(safe-area-inset-top));display:flex;align-items:center;justify-content:space-between}
-header b{font-size:18px;letter-spacing:.5px}
-.net{display:flex;align-items:center;gap:6px;font-size:13px}
-.net svg{width:18px;height:18px}
-.wrap{max-width:440px;margin:0 auto;padding:12px 16px 32px}
-.card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:0 1px 3px #0000000f}
-.sub{color:var(--sub);font-size:13px}
-h2{font-size:14px;margin:0 0 10px;color:var(--sub);font-weight:600}
-.bed{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.bed h1{font-size:17px;margin:0}
-.banner{border-radius:16px;padding:16px;color:#fff;display:flex;gap:14px;align-items:center;margin-bottom:12px;transition:background .3s}
-.banner svg{width:34px;height:34px;flex:none}
-.banner .t{font-size:20px;font-weight:700}
-.banner .d{font-size:13px;opacity:.92;margin-top:2px}
-.normal{background:var(--ok)}.low{background:var(--warn)}.fault{background:var(--fault)}.offline{background:var(--off)}
-.empty{background:var(--bad);animation:pulse 1s infinite}
-@keyframes pulse{50%{filter:brightness(1.3)}}
-.bag{display:flex;gap:18px;align-items:center}
-.bag svg{width:112px;flex:none}
-#fill{transition:transform .8s ease,fill .3s}
-.lvl{flex:1;min-width:0}
-.lvl .v{font-size:22px;font-weight:700;margin:2px 0 10px}
-.steps{display:flex;gap:4px}
-.steps i{flex:1;height:8px;border-radius:4px;background:var(--line);transition:background .3s}
-.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);font-size:15px}
-.row:first-child{padding-top:0}.row:last-child{border:0;padding-bottom:0}
-.pill{font-size:13px;padding:4px 10px;border-radius:999px;background:var(--line);white-space:nowrap}
-.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}
-button{font:inherit;border:0;border-radius:12px;padding:14px;width:100%;font-size:16px;font-weight:600;cursor:pointer}
-button:disabled{opacity:.4;cursor:default}
-.mute{background:var(--ink);color:var(--card)}
-.sound{background:var(--line);color:var(--ink);margin-top:8px}
-button,.link{display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px}
-.link{border-radius:12px;padding:14px;font-size:16px;font-weight:600;text-decoration:none;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:system-ui,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  background:var(--bg);color:var(--ink);font-size:16px;line-height:1.5;-webkit-tap-highlight-color:transparent}
 .ic{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.push h2{margin-bottom:4px}
-.push .link{margin-top:12px}
-@media (prefers-reduced-motion:reduce){.empty{animation:none}#fill{transition:none}}
-.log{list-style:none;margin:0;padding:0;max-height:240px;overflow:auto}
-.log li{display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
-.log li:last-child{border:0}
-.log time{color:var(--sub);font-variant-numeric:tabular-nums;flex:none}
+
+/* 頂部 */
+header{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;
+  padding:max(12px,env(safe-area-inset-top)) 16px 12px;background:color-mix(in srgb,var(--bg) 85%,transparent);
+  -webkit-backdrop-filter:saturate(1.6) blur(14px);backdrop-filter:saturate(1.6) blur(14px)}
+header .t{flex:1;min-width:0}
+header small{display:block;color:var(--sub);font-size:13px}
+header h1{margin:0;font-size:20px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:var(--surface);
+  box-shadow:var(--shadow);font-size:13px;font-weight:600;color:var(--sub);white-space:nowrap}
+.live{width:8px;height:8px;border-radius:50%;background:var(--off)}
+.chip.on .live{background:var(--ok);box-shadow:0 0 0 0 #1f9d5566;animation:live 2s infinite}
+@keyframes live{70%{box-shadow:0 0 0 6px #1f9d5500}}
+.bars{display:inline-flex;align-items:flex-end;gap:2px;height:12px}
+.bars i{width:3px;border-radius:1px;background:var(--line)}
+.bars i:nth-child(1){height:4px}.bars i:nth-child(2){height:7px}.bars i:nth-child(3){height:10px}.bars i:nth-child(4){height:12px}
+.bars i.on{background:currentColor}
+
+main{max-width:460px;margin:0 auto;padding:4px 16px calc(32px + env(safe-area-inset-bottom))}
+.card{background:var(--surface);border-radius:20px;padding:18px;margin-bottom:12px;box-shadow:var(--shadow)}
+h2{font-size:15px;margin:0 0 12px;color:var(--sub);font-weight:600}
+.sub{color:var(--sub);font-size:14px;margin:0}
+
+/* 主狀態 */
+.hero{--c:var(--off);--ci:var(--off-ink);position:relative;display:flex;align-items:center;gap:16px;padding:20px 18px;
+  background:linear-gradient(160deg,color-mix(in srgb,var(--c) 16%,var(--surface)),var(--surface) 70%);
+  border:1.5px solid color-mix(in srgb,var(--c) 35%,transparent);transition:background .4s,border-color .4s}
+.hero[data-s=normal]{--c:var(--ok);--ci:var(--ok-ink)}
+.hero[data-s=low]{--c:var(--warn);--ci:var(--warn-ink)}
+.hero[data-s=empty]{--c:var(--bad);--ci:var(--bad-ink);animation:alarm 1.2s ease-in-out infinite}
+.hero[data-s=fault]{--c:var(--fault);--ci:var(--fault-ink)}
+@keyframes alarm{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--bad) 22%,transparent)}}
+.hero svg.bag{width:118px;flex:none;overflow:visible}
+.hero .info{flex:1;min-width:0}
+.eyebrow{display:inline-flex;align-items:center;gap:6px;margin:0 0 4px;font-size:13px;font-weight:700;color:var(--ci)}
+.eyebrow .ic{width:18px;height:18px}
+.hero h2{font-size:23px;line-height:1.3;margin:0 0 6px;color:var(--ink);font-weight:800}
+.hero .hint{margin:0 0 12px;color:var(--sub);font-size:15px}
+.since{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--sub);font-variant-numeric:tabular-nums}
+.since .ic{width:16px;height:16px}
+
+/* 點滴袋動畫 */
+#liquid{transition:transform 1s cubic-bezier(.3,.8,.3,1),opacity .4s}
+#wave{animation:wave 3s linear infinite}
+@keyframes wave{to{transform:translateX(-40px)}}
+#drop{opacity:0}
+.dripping #drop{animation:drop 1.6s cubic-bezier(.5,0,1,.6) infinite}
+@keyframes drop{0%{transform:translateY(0);opacity:0}15%{opacity:1}75%{transform:translateY(20px);opacity:1}100%{transform:translateY(20px);opacity:0}}
+
+/* 階段 */
+.stages{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;list-style:none;margin:0 0 12px;padding:0}
+.stages li{position:relative;padding:12px 4px 10px;border-radius:14px;background:var(--surface);box-shadow:var(--shadow);
+  text-align:center;font-size:14px;font-weight:600;color:var(--sub);transition:all .3s}
+.stages li::before{content:"";display:block;height:5px;border-radius:3px;margin:0 10px 8px;background:var(--line);transition:background .3s}
+.stages li.done::before{background:color-mix(in srgb,var(--c) 45%,var(--line))}
+.stages li.now{color:var(--ink)}
+.stages li.now::before{background:var(--c)}
+.stages li.now::after{content:"目前";position:absolute;top:-8px;left:50%;transform:translateX(-50%);
+  font-size:11px;padding:1px 8px;border-radius:999px;background:var(--c);color:#fff}
+
+/* 按鈕 */
+.btn{font:inherit;font-size:16px;font-weight:700;border:0;border-radius:14px;min-height:52px;padding:12px 16px;width:100%;
+  display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;text-decoration:none;position:relative;overflow:hidden;
+  transition:transform .12s,opacity .2s,background .2s}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.45;cursor:default;transform:none}
+.btn+.btn{margin-top:10px}
+.dark{background:var(--ink);color:var(--surface)}
+.soft{background:var(--blue-soft);color:var(--blue)}
+.btn .meter{position:absolute;left:0;bottom:0;height:4px;background:currentColor;opacity:.5;transition:width 1s linear}
+
+/* 感測器 */
+.sensors{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sensor{border-radius:14px;background:var(--bg);padding:12px 14px}
+.sensor b{display:block;font-size:13px;color:var(--sub);font-weight:600}
+.sensor span{display:flex;align-items:center;gap:6px;font-weight:700;margin-top:2px}
+.sensor .dot{width:10px;height:10px;border-radius:50%;background:var(--off)}
+.sensor.yes .dot{background:var(--ok)}
+.sensor.no .dot{background:var(--bad)}
+.meta{display:flex;justify-content:space-between;gap:8px;margin-top:12px;color:var(--sub);font-size:14px}
+
+/* 推播 */
+.push{display:flex;gap:14px;align-items:flex-start}
+.push .badge{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--blue-soft);color:var(--blue);flex:none}
+.push .badge.ok{background:color-mix(in srgb,var(--ok) 16%,var(--surface));color:var(--ok-ink)}
+.push .body{flex:1;min-width:0}
+.push b{display:block;font-size:16px}
+.push .btn{margin-top:12px;min-height:46px;font-size:15px}
+
+/* 事件紀錄 */
+.log{list-style:none;margin:0;padding:0;max-height:260px;overflow:auto}
+.log li{position:relative;display:flex;gap:12px;padding:0 0 14px 22px}
+.log li::before{content:"";position:absolute;left:5px;top:8px;width:10px;height:10px;border-radius:50%;background:var(--c,var(--off))}
+.log li::after{content:"";position:absolute;left:9.5px;top:20px;bottom:0;width:1px;background:var(--line)}
+.log li:last-child::after{display:none}
+.log time{color:var(--sub);font-variant-numeric:tabular-nums;font-size:14px;flex:none}
+.empty-note{color:var(--sub);text-align:center;margin:4px 0}
+
 .demo{display:none}
-.demo .btns{display:flex;gap:6px}
-.demo button{padding:10px 4px;font-size:13px;background:var(--line);color:var(--ink)}
+.demo .row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.demo .btn{min-height:44px;font-size:14px;padding:8px 4px;margin:0}
+.foot{color:var(--sub);font-size:13px;text-align:center;margin:20px 8px 0}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-off" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M8.5 16.4a5 5 0 0 1 7 0"/><path d="M5 12.9a10 10 0 0 1 5.2-2.7"/><path d="M19 12.9a10 10 0 0 0-2.1-1.6"/><path d="M2 8.8a15 15 0 0 1 4.2-2.6"/><path d="M22 8.8a15 15 0 0 0-11.3-3.7"/><path d="m2 2 20 20"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m2 2 20 20"/></symbol>
+  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.4 18.4a9 9 0 0 0 0-12.7"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></symbol>
+</svg>
+
 <header>
-  <b>點滴監控</b>
-  <span class="net"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0"/><circle cx="12" cy="19" r="1.2" fill="currentColor"/></svg><span id="net">連線中</span></span>
+  <div class="t"><small>點滴監控</small><h1 id="bed">連線中…</h1></div>
+  <span class="chip" id="conn"><span class="live"></span><span id="connText">連線中</span><span class="bars" id="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span></span>
 </header>
 
-<div class="wrap">
-  <div class="banner offline" id="banner">
-    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22zm7-6V11a7 7 0 0 0-5.5-6.84V3.5a1.5 1.5 0 0 0-3 0v.66A7 7 0 0 0 5 11v5l-2 2v1h18v-1z"/></svg>
-    <div><div class="t" id="st">連線中…</div><div class="d" id="since">正在取得點滴狀態</div></div>
-  </div>
-
-  <div class="card bed"><h1 id="bed">—</h1><span class="sub" id="upd"></span></div>
-
-  <div class="card bag">
-    <svg viewBox="0 0 120 192" aria-hidden="true">
-      <defs><clipPath id="clip"><path d="M30 20h60q12 0 12 12v98q0 22-22 30H40q-22-8-22-30V32q0-12 12-12z"/></clipPath></defs>
-      <rect x="51" y="3" width="18" height="17" rx="5" fill="none" stroke="var(--sub)" stroke-width="3"/>
-      <g clip-path="url(#clip)"><rect id="fill" x="0" y="0" width="120" height="200" fill="var(--liq)" style="transform:translateY(160px)"/></g>
-      <path d="M30 20h60q12 0 12 12v98q0 22-22 30H40q-22-8-22-30V32q0-12 12-12z" fill="none" stroke="var(--sub)" stroke-width="3"/>
-      <rect x="53" y="160" width="14" height="14" rx="2" fill="var(--sub)"/>
-      <path d="M60 174v18" stroke="var(--sub)" stroke-width="3"/>
-      <line x1="10" y1="62" x2="110" y2="62" stroke="var(--warn)" stroke-width="2" stroke-dasharray="5 3"/>
-      <line x1="10" y1="122" x2="110" y2="122" stroke="var(--bad)" stroke-width="2" stroke-dasharray="5 3"/>
-      <text x="96" y="57" text-anchor="end" font-size="11" font-weight="700" fill="var(--warn)">上位</text>
-      <text x="96" y="117" text-anchor="end" font-size="11" font-weight="700" fill="var(--bad)">下位</text>
+<main>
+  <section class="card hero" id="hero" data-s="offline" role="status" aria-live="polite">
+    <svg class="bag" id="bag" viewBox="0 0 140 232" aria-hidden="true">
+      <defs><clipPath id="clip"><path d="M30 22h80q14 0 14 14v108q0 26-26 36H42q-26-10-26-36V36q0-14 14-14z"/></clipPath></defs>
+      <rect x="58" y="3" width="24" height="18" rx="7" fill="none" stroke="var(--sub)" stroke-width="3"/>
+      <g clip-path="url(#clip)">
+        <g id="liquid" style="transform:translateY(112px)">
+          <path id="wave" d="M0 6q10-6 20 0t20 0 20 0 20 0 20 0 20 0 20 0 20 0 20 0V200H0z" fill="var(--liquid)" opacity=".85"/>
+        </g>
+      </g>
+      <path d="M30 22h80q14 0 14 14v108q0 26-26 36H42q-26-10-26-36V36q0-14 14-14z" fill="none" stroke="var(--sub)" stroke-width="3"/>
+      <line x1="16" y1="82" x2="124" y2="82" stroke="var(--sub)" stroke-width="1.5" stroke-dasharray="4 4" opacity=".7"/>
+      <line x1="16" y1="142" x2="124" y2="142" stroke="var(--sub)" stroke-width="1.5" stroke-dasharray="4 4" opacity=".7"/>
+      <text x="22" y="77" font-size="11" font-weight="700" fill="var(--sub)">上位</text>
+      <text x="22" y="137" font-size="11" font-weight="700" fill="var(--sub)">下位</text>
+      <rect x="121" y="72" width="18" height="20" rx="5" fill="var(--surface)" stroke="var(--sub)" stroke-width="2"/>
+      <circle id="dotU" cx="130" cy="82" r="4.5" fill="var(--off)"/>
+      <rect x="121" y="132" width="18" height="20" rx="5" fill="var(--surface)" stroke="var(--sub)" stroke-width="2"/>
+      <circle id="dotL" cx="130" cy="142" r="4.5" fill="var(--off)"/>
+      <rect x="63" y="180" width="14" height="9" fill="var(--sub)"/>
+      <rect x="57" y="189" width="26" height="32" rx="7" fill="none" stroke="var(--sub)" stroke-width="2.5"/>
+      <ellipse id="drop" cx="70" cy="195" rx="3" ry="4" fill="var(--liquid)"/>
+      <path d="M70 221v11" stroke="var(--sub)" stroke-width="3"/>
     </svg>
-    <div class="lvl">
-      <div class="sub">目前液位</div>
-      <div class="v" id="lv">—</div>
-      <div class="steps"><i id="s1"></i><i id="s2"></i><i id="s3"></i></div>
-      <div class="sub" id="hint" style="margin-top:10px"></div>
+    <div class="info">
+      <p class="eyebrow"><svg class="ic" id="stIcon"><use href="#i-clock"/></svg><span id="eyebrow">取得狀態中</span></p>
+      <h2 id="st">連線中…</h2>
+      <p class="hint" id="hint">正在連線到點滴監測裝置</p>
+      <span class="since"><svg class="ic"><use href="#i-clock"/></svg><span id="since">—</span></span>
     </div>
-  </div>
+  </section>
 
-  <div class="card">
-    <div class="row"><span>上位感測器</span><span class="pill" id="u">—</span></div>
-    <div class="row"><span>下位感測器</span><span class="pill" id="l">—</span></div>
-    <div class="row"><span>現場蜂鳴器</span><span class="pill" id="m">—</span></div>
-  </div>
+  <ol class="stages" id="stages" aria-label="液位階段">
+    <li data-k="normal">充足</li><li data-k="low">偏低</li><li data-k="empty">耗盡</li>
+  </ol>
 
-  <div class="card">
-    <button class="mute" id="muteBtn" onclick="mute()" disabled>
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m2 2 20 20"/></svg>
-      靜音現場警報</button>
-    <button class="sound" id="soundBtn" onclick="enableSound()">
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4.7a.7.7 0 0 0-1.2-.5L6.4 7.6A1.4 1.4 0 0 1 5.4 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.4a1.4 1.4 0 0 1 1 .4l3.4 3.4a.7.7 0 0 0 1.2-.5z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.4 18.4a9 9 0 0 0 0-12.7"/></svg>
-      <span id="soundText">開啟這頁的提示音</span></button>
-  </div>
+  <section class="card">
+    <button class="btn dark" id="muteBtn" type="button" onclick="mute()" disabled>
+      <svg class="ic"><use href="#i-mute"/></svg><span id="muteText">靜音現場警報</span><span class="meter" id="meter" style="width:0"></span>
+    </button>
+    <button class="btn soft" id="soundBtn" type="button" onclick="enableSound()">
+      <svg class="ic"><use href="#i-sound"/></svg><span id="soundText">開啟這頁的提示音</span>
+    </button>
+  </section>
 
-  <div class="card push">
-    <h2>手機推播</h2>
-    <p class="sub" id="pushInfo">手機鎖定時也能收到警報。</p>
-    <a class="sound link" href="https://youenc120-ux.github.io/smart-iv-drip-alert/" target="_blank" rel="noopener">
-      <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
-      設定推播（開啟點滴警報 App）</a>
-    <button class="sound" id="pushTestBtn" onclick="pushTest()" hidden>傳送測試推播</button>
-  </div>
+  <section class="card">
+    <h2>感測器</h2>
+    <div class="sensors">
+      <div class="sensor" id="u"><b>上位</b><span><i class="dot"></i><em id="uText" style="font-style:normal">—</em></span></div>
+      <div class="sensor" id="l"><b>下位</b><span><i class="dot"></i><em id="lText" style="font-style:normal">—</em></span></div>
+    </div>
+    <div class="meta"><span>現場蜂鳴器</span><b id="m">—</b></div>
+  </section>
 
-  <div class="card">
+  <section class="card push">
+    <span class="badge" id="pushBadge"><svg class="ic"><use href="#i-phone"/></svg></span>
+    <div class="body">
+      <b id="pushTitle">手機推播</b>
+      <p class="sub" id="pushInfo">手機鎖定時也能收到警報。</p>
+      <a class="btn soft" href="https://youenc120-ux.github.io/smart-iv-drip-alert/" target="_blank" rel="noopener">
+        <svg class="ic"><use href="#i-bell"/></svg>設定推播</a>
+      <button class="btn soft" id="pushTestBtn" type="button" onclick="pushTest()" hidden>傳送測試推播</button>
+    </div>
+  </section>
+
+  <section class="card">
     <h2>事件紀錄</h2>
-    <ul class="log" id="log"><li class="sub">尚無事件</li></ul>
-  </div>
+    <ul class="log" id="log"><li style="padding-left:0"><p class="empty-note" style="width:100%">尚無事件</p></li></ul>
+  </section>
 
-  <div class="card demo" id="demo">
+  <section class="card demo" id="demo">
     <h2>展示模式：點按切換模擬狀態</h2>
-    <div class="btns">
-      <button data-s="normal">充足</button><button data-s="low">偏低</button>
-      <button data-s="empty">耗盡</button><button data-s="fault">異常</button>
+    <div class="row">
+      <button class="btn soft" data-s="normal">充足</button><button class="btn soft" data-s="low">偏低</button>
+      <button class="btn soft" data-s="empty">耗盡</button><button class="btn soft" data-s="fault">異常</button>
     </div>
-  </div>
-</div>
+  </section>
+
+  <p class="foot">智慧點滴注射預警系統・專題原型，非醫療器材</p>
+</main>
 
 <script>
-const $ = id => document.getElementById(id);
+const $ = (id) => document.getElementById(id);
 // 用電腦直接開檔案、在 GitHub Pages 上，或網址加 ?demo，就進入展示模式（不需要硬體）
 const DEMO = !location.protocol.startsWith('http') || location.hostname.endsWith('github.io') || location.search.includes('demo');
 
 const INFO = {
-  normal: { lv: '高於上位', hint: '液量充足，持續監測中', fill: 38,  n: 3, c: 'var(--ok)' },
-  low:    { lv: '上、下位之間', hint: '請準備更換點滴',   fill: 92,  n: 2, c: 'var(--warn)' },
-  empty:  { lv: '低於下位', hint: '請立即更換點滴！',     fill: 140, n: 1, c: 'var(--bad)' },
-  fault:  { lv: '無法判斷', hint: '請檢查感測器安裝位置', fill: 92,  n: 0, c: 'var(--fault)' }
+  normal:  { eyebrow: '一切正常', icon: 'check', hint: '液量充足，持續監測中',   y: 46,  stage: 0, drip: true },
+  low:     { eyebrow: '請注意',   icon: 'alert', hint: '請準備更換點滴',         y: 108, stage: 1, drip: true },
+  empty:   { eyebrow: '緊急',     icon: 'bell',  hint: '請立即更換點滴！',       y: 160, stage: 2, drip: false },
+  fault:   { eyebrow: '需要檢查', icon: 'alert', hint: '請檢查感測器安裝位置',   y: 108, stage: -1, drip: false },
+  offline: { eyebrow: '連線中斷', icon: 'off',   hint: '請確認裝置電源與 Wi-Fi', y: 108, stage: -1, drip: false },
 };
 const TEXT = { normal: '液量充足', low: '第一階段：液量偏低', empty: '第二階段：請立即更換', fault: '感測器異常' };
+const LOG_COLOR = { normal: 'var(--ok)', low: 'var(--warn)', empty: 'var(--bad)', fault: 'var(--fault)', offline: 'var(--off)' };
 
-let last = null, ctx = null, fails = 0;
+let last = null, ctx = null, fails = 0, muteTotal = 0;
 const demo = { state: 'normal', since: Date.now(), muteUntil: 0 };
 
 function enableSound() {
@@ -166,54 +262,86 @@ function beep(n, f = 1000) {
   }
 }
 function vib(p) { if (navigator.vibrate) navigator.vibrate(p); }
-function clock() { return new Date().toLocaleTimeString('zh-TW', { hour12: false }); }
-function fmt(s) { const m = Math.floor(s / 60); return m ? m + ' 分 ' + (s % 60) + ' 秒' : s + ' 秒'; }
+function clock() { return new Date().toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' }); }
+function fmt(s) {
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  if (h) return `已持續 ${h} 小時 ${m} 分`;
+  if (m) return `已持續 ${m} 分 ${s % 60} 秒`;
+  return `已持續 ${s} 秒`;
+}
 
-function addLog(text) {
+function addLog(state, text) {
   const ul = $('log');
-  if (ul.firstElementChild && ul.firstElementChild.classList.contains('sub')) ul.innerHTML = '';
+  if (ul.querySelector('.empty-note')) ul.innerHTML = '';
   const li = document.createElement('li');
+  li.style.setProperty('--c', LOG_COLOR[state]);
   li.innerHTML = '<time>' + clock() + '</time><span></span>';
   li.lastChild.textContent = text;
   ul.prepend(li);
   while (ul.children.length > 30) ul.lastChild.remove();
 }
-function sensor(el, ok) {
-  el.innerHTML = '<span class="dot" style="background:' + (ok ? 'var(--ok)' : 'var(--bad)') + '"></span>' + (ok ? '有液體' : '無液體');
+
+function setConn(online, rssi, ap) {
+  $('conn').classList.toggle('on', online);
+  $('connText').textContent = !online ? '離線' : ap ? '熱點模式' : '即時';
+  const level = !online || ap ? 0 : rssi > -55 ? 4 : rssi > -67 ? 3 : rssi > -78 ? 2 : 1;
+  [...$('bars').children].forEach((b, i) => b.classList.toggle('on', i < level));
+  $('bars').hidden = !online || ap;
 }
-function signal(d) {
-  if (d.ap) return '熱點模式';
-  if (d.rssi > -60) return '訊號強';
-  if (d.rssi > -75) return '訊號中';
-  return '訊號弱';
+
+function setHero(state, title) {
+  const i = INFO[state];
+  const hero = $('hero');
+  hero.dataset.s = state;
+  $('eyebrow').textContent = i.eyebrow;
+  $('stIcon').innerHTML = `<use href="#i-${i.icon}"/>`;
+  $('st').textContent = title;
+  $('hint').textContent = i.hint;
+  $('liquid').style.transform = `translateY(${i.y}px)`;
+  $('liquid').style.opacity = state === 'offline' ? 0.25 : state === 'fault' ? 0.5 : 1;
+  $('bag').classList.toggle('dripping', i.drip);
+  $('stages').style.setProperty('--c', getComputedStyle(hero).getPropertyValue('--c'));
+  [...$('stages').children].forEach((li, k) => {
+    li.classList.toggle('now', k === i.stage);
+    li.classList.toggle('done', i.stage >= 0 && k < i.stage);
+  });
+}
+
+function sensor(id, liquid) {
+  $(id).className = 'sensor ' + (liquid ? 'yes' : 'no');
+  $(id + 'Text').textContent = liquid ? '有液體' : '無液體';
+  $(id === 'u' ? 'dotU' : 'dotL').setAttribute('fill', liquid ? 'var(--ok)' : 'var(--bad)');
 }
 
 function render(d) {
-  const i = INFO[d.state];
-  $('banner').className = 'banner ' + d.state;
-  $('st').textContent = d.text;
-  $('since').textContent = '已持續 ' + fmt(d.since);
   $('bed').textContent = d.bed;
-  $('upd').textContent = '更新於 ' + clock();
-  $('net').textContent = signal(d);
+  setConn(true, d.rssi, d.ap);
+  setHero(d.state, d.text);
+  $('since').textContent = fmt(d.since);
+  sensor('u', d.upper);
+  sensor('l', d.lower);
 
-  $('fill').style.transform = 'translateY(' + i.fill + 'px)';
-  $('fill').style.fill = d.state === 'fault' ? 'var(--off)' : 'var(--liq)';
-  $('lv').textContent = i.lv;
-  $('lv').style.color = i.c;
-  $('hint').textContent = i.hint;
-  ['s1', 's2', 's3'].forEach((s, k) => $(s).style.background = k < i.n ? i.c : '');
-
-  sensor($('u'), d.upper);
-  sensor($('l'), d.lower);
-  $('m').textContent = d.muted ? '靜音中 ' + d.muteLeft + ' 秒' : (d.state === 'normal' ? '待命' : '警報中');
+  // 靜音倒數
+  if (d.muted) {
+    muteTotal = Math.max(muteTotal, d.muteLeft);
+    $('muteText').textContent = `已靜音・${d.muteLeft} 秒`;
+    $('meter').style.width = (muteTotal ? (d.muteLeft / muteTotal) * 100 : 0) + '%';
+  } else {
+    muteTotal = 0;
+    $('muteText').textContent = '靜音現場警報';
+    $('meter').style.width = '0';
+  }
   $('muteBtn').disabled = d.state === 'normal' || d.muted;
-  $('pushInfo').textContent = d.push ? '已綁定 ' + d.push + ' 支手機，警報會即時推播。' : '尚未綁定手機。手機鎖定時也能收到警報。';
+  $('m').textContent = d.muted ? '靜音中' : d.state === 'normal' ? '待命' : '警報中';
+
+  $('pushTitle').textContent = d.push ? `已綁定 ${d.push} 支手機` : '手機推播';
+  $('pushInfo').textContent = d.push ? '警報會即時推播，手機鎖定也收得到。' : '尚未綁定手機。設定後，手機鎖定時也能收到警報。';
+  $('pushBadge').classList.toggle('ok', !!d.push);
   $('pushTestBtn').hidden = !d.push;
   document.title = (d.state === 'empty' ? '🔴 ' : d.state === 'low' ? '🟡 ' : '') + '點滴監控';
 
   if (d.state !== last) {
-    if (last !== null || d.state !== 'normal') addLog(d.text);
+    if (last !== null || d.state !== 'normal') addLog(d.state, d.text);
     if (d.state === 'low')   { beep(2, 880);  vib(300); }
     if (d.state === 'empty') { beep(5, 1200); vib([300, 100, 300, 100, 300]); }
     if (d.state === 'fault') { beep(1, 600); }
@@ -224,11 +352,10 @@ function render(d) {
 }
 
 function offline() {
-  $('banner').className = 'banner offline';
-  $('st').textContent = '裝置離線';
-  $('since').textContent = '請確認裝置電源與 Wi-Fi';
-  $('net').textContent = '離線';
-  addLog('與裝置失去連線');
+  setConn(false);
+  setHero('offline', '裝置離線');
+  $('since').textContent = '最後更新 ' + clock();
+  addLog('offline', '與裝置失去連線');
   beep(3, 500); vib(500);
   last = null;
 }
@@ -236,10 +363,10 @@ function offline() {
 function demoStatus() {
   const now = Date.now(), s = demo.state, muted = now < demo.muteUntil;
   return {
-    bed: '301 病房 A 床（展示）', state: s, text: TEXT[s],
+    bed: '301 病房 A 床', state: s, text: TEXT[s],
     upper: s === 'normal' || s === 'fault', lower: s === 'normal' || s === 'low',
     muted, muteLeft: muted ? Math.ceil((demo.muteUntil - now) / 1000) : 0,
-    since: Math.floor((now - demo.since) / 1000), rssi: -55, ap: false
+    since: Math.floor((now - demo.since) / 1000), rssi: -55, ap: false, push: 1
   };
 }
 
@@ -254,14 +381,6 @@ async function poll() {
   }
 }
 
-async function pushTest() {
-  const b = $('pushTestBtn');
-  b.disabled = true;
-  b.textContent = '已送出，幾秒內會收到';
-  if (!DEMO) await fetch('/pushtest', { method: 'POST' }).catch(() => {});
-  setTimeout(() => { b.disabled = false; b.textContent = '傳送測試推播'; }, 5000);
-}
-
 function mute() {
   if (DEMO) {
     demo.muteUntil = Date.now() + (demo.state === 'empty' ? 60000 : 300000);
@@ -271,12 +390,20 @@ function mute() {
   fetch('/mute', { method: 'POST' }).then(poll);
 }
 
+async function pushTest() {
+  const b = $('pushTestBtn');
+  b.disabled = true;
+  b.textContent = '已送出，幾秒內會收到';
+  if (!DEMO) await fetch('/pushtest', { method: 'POST' }).catch(() => {});
+  setTimeout(() => { b.disabled = false; b.textContent = '傳送測試推播'; }, 5000);
+}
+
 if (DEMO) {
   $('demo').style.display = 'block';
-  document.querySelectorAll('#demo button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#demo button').forEach((b) => b.onclick = () => {
     if (b.dataset.s !== demo.state) {
-      const worse = Object.keys(TEXT).indexOf(b.dataset.s) > Object.keys(TEXT).indexOf(demo.state);
-      if (worse) demo.muteUntil = 0;
+      const order = Object.keys(TEXT);
+      if (order.indexOf(b.dataset.s) > order.indexOf(demo.state)) demo.muteUntil = 0;
       demo.state = b.dataset.s;
       demo.since = Date.now();
     }
