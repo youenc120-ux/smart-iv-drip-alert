@@ -205,6 +205,7 @@ inline int send(const Subscription& sub, const String& payload, const uint8_t pr
   http.addHeader("Urgency", "high");
   http.addHeader("Authorization", "vapid t=" + jwt + ", k=" + pubB64);
   int code = http.POST(body.data(), body.size());
+  if (code >= 300) Serial.printf("[推播] 推播服務拒絕：%s\n", http.getString().c_str());  // 例如 Apple 的 BadJwtToken
   http.end();
   return code;
 }

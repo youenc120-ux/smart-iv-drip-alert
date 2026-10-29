@@ -247,6 +247,16 @@ void handleUnsubscribe() {
   replyJson(true, nullptr);
 }
 
+// 傳一則測試推播給所有已綁定的手機
+void handlePushTest() {
+  if (subs.empty()) return replyJson(false, "還沒有綁定任何手機");
+  xSemaphoreTake(subsLock, portMAX_DELAY);
+  welcomeEndpoint = "";  // 空字串 = 所有手機
+  xSemaphoreGive(subsLock);
+  queueNotice(state, "這是測試推播，收到代表推播功能正常。", true);
+  replyJson(true, nullptr);
+}
+
 // ===== 推播通知 =====
 // HTTPS 連線要 1–3 秒，放在獨立工作執行，蜂鳴器與網頁才不會卡住
 QueueHandle_t noticeQueue;
@@ -269,7 +279,8 @@ void sendWebPush(const Notice& n) {
   if (!vapidReady) return;
   std::vector<webpush::Subscription> targets;
   xSemaphoreTake(subsLock, portMAX_DELAY);
-  for (auto& s : subs) if (!n.welcome || s.endpoint == welcomeEndpoint) targets.push_back(s);
+  for (auto& s : subs)
+    if (!n.welcome || welcomeEndpoint.isEmpty() || s.endpoint == welcomeEndpoint) targets.push_back(s);
   xSemaphoreGive(subsLock);
   if (targets.empty()) return;
 
@@ -293,6 +304,47 @@ void sendTelegram(const Notice& n) {
   for (int i = 0; i < 2 && !postJson("Telegram", url, j); i++) delay(3000);
 }
 
+// 公曆日期換算成 1970-01-01 起算的天數，用來把 HTTP Date 標頭轉成 Unix 時間
+long daysFromCivil(int y, int m, int d) {
+  y -= m <= 2;
+  long era = (y >= 0 ? y : y - 399) / 400;
+  long yoe = y - era * 400;
+  long doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+  long doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+  return era * 146097 + doe - 719468;
+}
+
+// 推播簽章需要正確時間。先等 NTP；學校或公司網路常擋 NTP，就改用 HTTPS 回應的 Date 標頭校時
+bool ensureTime() {
+  for (int i = 0; i < 20 && time(nullptr) < 1700000000; i++) delay(500);
+  if (time(nullptr) >= 1700000000) return true;
+
+  WiFiClientSecure client;
+  client.setInsecure();
+  HTTPClient http;
+  const char* keys[] = { "Date" };
+  if (!http.begin(client, "https://www.google.com/generate_204")) return false;
+  http.collectHeaders(keys, 1);
+  http.GET();
+  String date = http.header("Date");  // 例如 "Wed, 29 Oct 2026 08:12:33 GMT"
+  http.end();
+
+  int day, year, hh, mm, ss;
+  char mon[4] = {0};
+  if (sscanf(date.c_str(), "%*3s, %d %3s %d %d:%d:%d", &day, mon, &year, &hh, &mm, &ss) != 6) {
+    Serial.println("[時間] 校時失敗，無法發送推播");
+    return false;
+  }
+  const char* months = "JanFebMarAprMayJunJulAugSepOctNovDec";
+  const char* p = strstr(months, mon);
+  if (!p) return false;
+  int month = (p - months) / 3 + 1;
+  struct timeval tv = { (time_t)(daysFromCivil(year, month, day) * 86400L + hh * 3600L + mm * 60L + ss), 0 };
+  settimeofday(&tv, nullptr);
+  Serial.println("[時間] NTP 無回應，已改用網站時間校時");
+  return true;
+}
+
 void notifyTask(void*) {
   Notice n;
   for (;;) {
@@ -301,7 +353,7 @@ void notifyTask(void*) {
       Serial.println("[通知] 未連上網際網路（熱點模式或斷線），略過推播");
       continue;
     }
-    for (int i = 0; i < 20 && time(nullptr) < 1700000000; i++) delay(500);  // 等待網路校時
+    if (!ensureTime()) continue;
     sendWebPush(n);
     sendTelegram(n);
   }
@@ -391,6 +443,7 @@ void setup() {
   server.on("/pair", handlePair);
   server.on("/subscribe", HTTP_POST, handleSubscribe);
   server.on("/unsubscribe", HTTP_POST, handleUnsubscribe);
+  server.on("/pushtest", HTTP_POST, handlePushTest);
   server.begin();
 }
 

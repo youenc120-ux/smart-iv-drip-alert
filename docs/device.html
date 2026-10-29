@@ -113,6 +113,7 @@ button,.link{display:flex;align-items:center;justify-content:center;gap:8px;min-
     <a class="sound link" href="https://youenc120-ux.github.io/smart-iv-drip-alert/" target="_blank" rel="noopener">
       <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
       設定推播（開啟點滴警報 App）</a>
+    <button class="sound" id="pushTestBtn" onclick="pushTest()" hidden>傳送測試推播</button>
   </div>
 
   <div class="card">
@@ -206,6 +207,7 @@ function render(d) {
   $('m').textContent = d.muted ? '靜音中 ' + d.muteLeft + ' 秒' : (d.state === 'normal' ? '待命' : '警報中');
   $('muteBtn').disabled = d.state === 'normal' || d.muted;
   $('pushInfo').textContent = d.push ? '已綁定 ' + d.push + ' 支手機，警報會即時推播。' : '尚未綁定手機。手機鎖定時也能收到警報。';
+  $('pushTestBtn').hidden = !d.push;
   document.title = (d.state === 'empty' ? '🔴 ' : d.state === 'low' ? '🟡 ' : '') + '點滴監控';
 
   if (d.state !== last) {
@@ -248,6 +250,14 @@ async function poll() {
   } catch (e) {
     if (++fails === 3) offline();
   }
+}
+
+async function pushTest() {
+  const b = $('pushTestBtn');
+  b.disabled = true;
+  b.textContent = '已送出，幾秒內會收到';
+  if (!DEMO) await fetch('/pushtest', { method: 'POST' }).catch(() => {});
+  setTimeout(() => { b.disabled = false; b.textContent = '傳送測試推播'; }, 5000);
 }
 
 function mute() {
