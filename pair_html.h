@@ -13,12 +13,22 @@ body{margin:0;font-family:system-ui,-apple-system,"PingFang TC","Noto Sans TC",s
 svg{width:56px;height:56px}
 h1{font-size:22px;margin:12px 0 8px}
 p{color:var(--sub);line-height:1.6;margin:0 0 8px}
-a.btn{display:block;margin-top:20px;padding:14px;border-radius:12px;background:var(--blue);color:#fff;text-decoration:none;font-weight:600;min-height:44px;box-sizing:border-box}
+.btn{display:block;width:100%;margin-top:20px;padding:14px;border:0;border-radius:12px;background:var(--blue);color:#fff;text-decoration:none;
+  font:inherit;font-weight:600;min-height:48px;box-sizing:border-box;cursor:pointer}
+form{text-align:left;margin-top:16px}
+label{display:block;font-weight:600;margin-bottom:6px}
+input{font:inherit;font-size:20px;letter-spacing:4px;width:100%;min-height:52px;padding:10px 14px;border-radius:12px;border:1.5px solid #cfd6df;
+  background:var(--bg);color:var(--ink);box-sizing:border-box;text-align:center}
 </style></head><body>
 <main class="card" role="status" aria-live="polite">
   <svg id="ic" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke-dasharray="4 3"/></svg>
   <h1 id="t">連結中…</h1>
   <p id="d">正在把這支手機加入推播名單</p>
+  <form id="pinForm" hidden>
+    <label for="pin">配對碼</label>
+    <input id="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="one-time-code" placeholder="請輸入 4–8 位數字">
+    <button class="btn" type="submit">連結</button>
+  </form>
   <a id="back" class="btn" hidden>返回推播 App</a>
 </main>
 <script>
@@ -35,21 +45,35 @@ function show(ok, title, desc) {
   const r = p.get('r') || '';
   if (r.startsWith('https://')) { const b = document.getElementById('back'); b.href = r; b.hidden = false; }
 }
-(async () => {
-  const unsub = p.get('do') === 'unsub';
+const unsub = p.get('do') === 'unsub';
+async function go(pin) {
   if (!p.get('e')) return show(false, '缺少配對資料', '請從推播 App 按「連結裝置」開啟這一頁。');
   try {
     const r = await fetch(unsub ? '/unsubscribe' : '/subscribe', {
       method: 'POST',
-      body: new URLSearchParams({ endpoint: p.get('e'), p256dh: p.get('k') || '', auth: p.get('a') || '' })
+      body: new URLSearchParams({ endpoint: p.get('e'), p256dh: p.get('k') || '', auth: p.get('a') || '', pin: pin || '' })
     });
     const d = await r.json();
+    if (d.needPin) {
+      // 裝置設定了配對碼：請使用者輸入後再送一次
+      const ic = document.getElementById('ic');
+      ic.innerHTML = '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>';
+      ic.setAttribute('stroke', 'var(--blue)');
+      document.getElementById('t').textContent = '輸入配對碼';
+      document.getElementById('d').textContent = pin ? d.error : '這台裝置需要配對碼，請向負責的護理人員取得。';
+      document.getElementById('pinForm').hidden = false;
+      document.getElementById('pin').focus();
+      return;
+    }
+    document.getElementById('pinForm').hidden = true;
     if (!d.ok) return show(false, '連結失敗', d.error || '請重新操作一次。');
     if (unsub) show(true, '已取消連結', d.bed + ' 不會再推播到這支手機。');
     else show(true, '連結成功', d.bed + ' 的點滴警報會推播到這支手機，馬上會收到一則測試通知。');
   } catch (e) {
     show(false, '無法連線到裝置', '請確認手機與裝置在同一個 Wi-Fi。');
   }
-})();
+}
+document.getElementById('pinForm').onsubmit = (e) => { e.preventDefault(); go(document.getElementById('pin').value.trim()); };
+go('');
 </script>
 </body></html>)HTML";

@@ -142,10 +142,10 @@ input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blu
       <p class="sub">手機與裝置連上同一個 Wi-Fi，輸入裝置位址後按「連結」。</p>
       <label for="ipInput">裝置位址</label>
       <div class="field">
-        <input id="ipInput" inputmode="decimal" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="192.168.1.50">
+        <input id="ipInput" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="iv-monitor.local">
         <button class="btn primary small" id="pairBtn" type="button">連結</button>
       </div>
-      <p class="help">位址會顯示在 ESP32 的序列埠監控視窗。連結時會短暫跳到裝置頁面，完成後點左上角「完成」返回。</p>
+      <p class="help">預設是 iv-monitor.local（可在裝置設定頁修改），也可以輸入 IP，例如 192.168.1.50。連結時會短暫跳到裝置頁面；如果裝置有設配對碼，會請你輸入。完成後點左上角「完成」返回。</p>
       <p class="err" id="devErr" role="alert"></p>
       <div id="devList"></div>
     </div>
@@ -267,7 +267,7 @@ async function pair(ip, unsub) {
 function onPairClick() {
   const ip = normalizeIp($('ipInput').value);
   if (!/^[a-z0-9.-]+(:\d+)?$/i.test(ip)) {
-    $('devErr').textContent = '位址格式不正確，例如 192.168.1.50';
+    $('devErr').textContent = '位址格式不正確，例如 iv-monitor.local 或 192.168.1.50';
     $('ipInput').focus();
     return;
   }

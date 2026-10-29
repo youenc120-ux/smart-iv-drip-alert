@@ -7,7 +7,9 @@
  *   - 第一階段（液位低於上位）：警示燈恆亮 + 提示音 + 推播
  *   - 第二階段（液位低於下位）：警示燈快閃 + 每秒警報 + 推播
  *   - 感測器狀態矛盾（上有液、下無液）判為感測器異常
- *   - 手機網頁即時監控（每秒更新）、遠端靜音
+ *   - 手機網頁即時監控（每秒更新）、遠端靜音、預估剩餘時間、更換紀錄
+ *   - 網頁設定頁：床位名稱、Wi-Fi、網址、配對碼、點滴參數（免重新燒錄）
+ *   - 固定網址：http://<裝置名稱>.local（mDNS）
  *   - 網頁推播：ESP32 直接加密並送到 Apple / Google 推播服務，不經第三方通知平台
  *
  * 接線（對應「點滴注射預警系統電路原理圖」）：
@@ -23,24 +25,27 @@
 #include <WebServer.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
+#include <ESPmDNS.h>
 #include <Preferences.h>
 #include <time.h>
 #include <vector>
 #include "webpush.h"
 #include "index_html.h"
 #include "pair_html.h"
+#include "settings_html.h"
 
 // ===== 使用者設定 =====
 // Wi-Fi 密碼與推播金鑰放在 secrets.h（不會上傳 GitHub）
 // 第一次使用：把 secrets.example.h 複製一份改名為 secrets.h 再填入，並執行 make_vapid.ps1
+// 之後床位名稱、Wi-Fi 等都可以在 http://<裝置>/settings 修改
 #include "secrets.h"
 
-const char* AP_SSID   = "IV-Monitor";      // 連不上 Wi-Fi 時自建熱點
-const char* BED_NAME  = "301 病房 A 床";
+const char* AP_SSID       = "IV-Monitor";  // 連不上 Wi-Fi 時自建熱點
 const char* VAPID_SUBJECT = "https://github.com/youenc120-ux/smart-iv-drip-alert";  // 推播服務出問題時的聯絡方式
 
 const unsigned long REPEAT_EMPTY_MS = 2UL * 60 * 1000;  // 第二階段未處理時每 2 分鐘再推播
-const size_t MAX_SUBS = 10;                              // 最多綁定幾支手機
+const size_t MAX_SUBS    = 10;                           // 最多綁定幾支手機
+const size_t MAX_HISTORY = 20;                           // 保留幾筆更換紀錄
 
 // 感測器偵測到液體時的輸出電位。
 // 反射式：光電晶體收到較強反射光時導通 -> 輸出 LOW。
@@ -68,6 +73,21 @@ WebServer server(80);
 DripState state = NORMAL;
 unsigned long stateSince = 0;
 unsigned long mutedUntil = 0;
+bool apMode = false;
+unsigned long restartAt = 0;  // 設定變更後延遲重新開機
+
+// 型別需在第一個函式前定義，Arduino 自動產生的函式宣告才找得到
+
+// 可在網頁上修改的設定（存在快閃記憶體）
+struct Config {
+  String bed = "301 病房 A 床";
+  String host = "iv-monitor";  // 固定網址 http://iv-monitor.local
+  String ssid, pass;           // 空白 = 使用 secrets.h
+  String pin;                  // 配對碼，空白 = 不需要
+  int mlBetween = 100;         // 上位到下位之間的液量（ml）
+  int mlBelow = 50;            // 下位以下的剩餘液量（ml）
+  int rateMlH = 0;             // 醫囑滴速（ml/小時），0 = 未設定
+} cfg;
 
 // 去彈跳
 struct Debounced {
@@ -79,9 +99,11 @@ struct Debounced {
 Debounced upper = { PIN_SENSOR_UPPER, true, true, 0 };
 Debounced lower = { PIN_SENSOR_LOWER, true, true, 0 };
 
-// 推播訊息（需在第一個函式前定義，Arduino 自動產生的宣告才找得到）
-// welcome = 剛綁定的手機才收到的測試通知
-struct Notice { uint8_t state; char body[160]; bool welcome; };
+// 推播訊息；welcome = 只送給剛綁定的手機（welcomeEndpoint 空白 = 全部手機）的測試通知
+struct Notice { uint8_t state; char body[200]; bool welcome; };
+
+// 一袋點滴的紀錄（Unix 秒，0 = 沒有發生或時間未知）
+struct BagRecord { uint32_t startAt, lowAt, emptyAt, ackAt, doneAt; };
 
 // 已綁定的手機（網頁伺服器與推播工作都會用到，以互斥鎖保護）
 std::vector<webpush::Subscription> subs;
@@ -90,6 +112,19 @@ String welcomeEndpoint;
 Preferences prefs;
 uint8_t vapidPriv[32];
 bool vapidReady = false;
+
+// 更換紀錄與滴速
+BagRecord history[MAX_HISTORY];
+size_t historyCount = 0;
+BagRecord cur = { 0, 0, 0, 0, 0 };
+uint32_t lastDoneAt = 0;          // 上一袋更換完成的時間 = 這一袋開始
+unsigned long lowEnteredMs = 0;   // 進入第一階段的 millis，用來實測滴速
+float bagRate = 0;                // 這一袋實測滴速（ml/小時）
+float lastRate = 0;               // 上一袋實測滴速
+
+// 配對碼嘗試次數限制
+int pinFails = 0;
+unsigned long pinLockUntil = 0;
 
 bool readLiquid(int pin) { return digitalRead(pin) == LIQUID_LEVEL; }
 
@@ -106,14 +141,19 @@ DripState evaluate() {
   return SENSOR_FAULT;  // 上有液、下無液：物理上不合理
 }
 
+uint32_t nowEpoch() {
+  time_t t = time(nullptr);
+  return t >= 1700000000 ? (uint32_t)t : 0;
+}
+
 // ===== 輸出（LED / 蜂鳴器），非阻塞 =====
 void updateOutputs(unsigned long now) {
   bool muted = now < mutedUntil;
   unsigned long t = now - stateSince;
   bool buzz = false;
 
-  // Wi-Fi 燈：已連線（或熱點模式）恆亮，STA 斷線時閃爍
-  bool wifiOk = WiFi.getMode() == WIFI_AP || WiFi.status() == WL_CONNECTED;
+  // Wi-Fi 燈：已連線（或熱點模式）恆亮，斷線時閃爍
+  bool wifiOk = apMode || WiFi.status() == WL_CONNECTED;
   digitalWrite(PIN_LED_WIFI, wifiOk || (now / 500) % 2);
 
   // 警示燈：第一階段恆亮、第二階段快閃、感測器異常慢閃
@@ -144,9 +184,114 @@ String jsonEscape(const char* s) {
   for (; *s; s++) {
     if (*s == '"' || *s == '\\') { out += '\\'; out += *s; }
     else if (*s == '\n') out += "\\n";
-    else out += *s;
+    else if ((uint8_t)*s >= 0x20) out += *s;
   }
   return out;
+}
+String jsonEscape(const String& s) { return jsonEscape(s.c_str()); }
+
+// ===== 設定 =====
+void loadConfig() {
+  prefs.begin("cfg", true);
+  cfg.bed       = prefs.getString("bed", cfg.bed);
+  cfg.host      = prefs.getString("host", cfg.host);
+  cfg.ssid      = prefs.getString("ssid", "");
+  cfg.pass      = prefs.getString("pass", "");
+  cfg.pin       = prefs.getString("pin", "");
+  cfg.mlBetween = prefs.getInt("mlBetween", cfg.mlBetween);
+  cfg.mlBelow   = prefs.getInt("mlBelow", cfg.mlBelow);
+  cfg.rateMlH   = prefs.getInt("rate", cfg.rateMlH);
+  prefs.end();
+}
+
+void saveConfig() {
+  prefs.begin("cfg", false);
+  prefs.putString("bed", cfg.bed);
+  prefs.putString("host", cfg.host);
+  prefs.putString("ssid", cfg.ssid);
+  prefs.putString("pass", cfg.pass);
+  prefs.putString("pin", cfg.pin);
+  prefs.putInt("mlBetween", cfg.mlBetween);
+  prefs.putInt("mlBelow", cfg.mlBelow);
+  prefs.putInt("rate", cfg.rateMlH);
+  prefs.end();
+}
+
+const char* wifiSsid() { return cfg.ssid.length() ? cfg.ssid.c_str() : WIFI_SSID; }
+const char* wifiPass() { return cfg.ssid.length() ? cfg.pass.c_str() : WIFI_PASS; }
+
+// ===== 更換紀錄 =====
+void loadHistory() {
+  prefs.begin("hist", true);
+  historyCount = prefs.getBytes("h", history, sizeof(history)) / sizeof(BagRecord);
+  lastDoneAt = prefs.getUInt("last", 0);
+  lastRate = prefs.getFloat("rate", 0);
+  prefs.end();
+}
+
+void saveHistory() {
+  prefs.begin("hist", false);
+  prefs.putBytes("h", history, historyCount * sizeof(BagRecord));
+  prefs.putUInt("last", lastDoneAt);
+  prefs.putFloat("rate", lastRate);
+  prefs.end();
+}
+
+// 狀態改變時更新這一袋的紀錄與實測滴速
+void trackBag(DripState next, DripState prev, unsigned long now) {
+  if (next == LOW_LEVEL && prev == NORMAL) {
+    cur = { lastDoneAt, nowEpoch(), 0, 0, 0 };
+    lowEnteredMs = now;
+    bagRate = 0;
+  } else if (next == EMPTY && prev != SENSOR_FAULT) {
+    if (!cur.lowAt && !cur.emptyAt) cur.startAt = lastDoneAt;
+    cur.emptyAt = nowEpoch();
+    // 上位到下位的液量 ÷ 花費時間 = 實測滴速；過快或過慢視為誤判
+    if (prev == LOW_LEVEL && lowEnteredMs) {
+      float hours = (now - lowEnteredMs) / 3600000.0f;
+      float r = cfg.mlBetween / hours;
+      if (r >= 5 && r <= 2000) { bagRate = r; lastRate = r; }
+    }
+  } else if (next == NORMAL && (prev == LOW_LEVEL || prev == EMPTY)) {
+    cur.doneAt = nowEpoch();
+    if (historyCount == MAX_HISTORY) {
+      memmove(history, history + 1, sizeof(BagRecord) * (MAX_HISTORY - 1));
+      historyCount--;
+    }
+    history[historyCount++] = cur;
+    lastDoneAt = cur.doneAt;
+    cur = { 0, 0, 0, 0, 0 };
+    lowEnteredMs = 0;
+    bagRate = 0;
+    saveHistory();
+  }
+}
+
+// 預估剩餘時間（秒），-1 = 無法預估。src 回傳滴速來源
+float currentRate(const char** src) {
+  if (state == EMPTY && bagRate > 0) { *src = "measured"; return bagRate; }
+  if (cfg.rateMlH > 0) { *src = "set"; return cfg.rateMlH; }
+  if (lastRate > 0) { *src = "last"; return lastRate; }
+  *src = "";
+  return 0;
+}
+
+long etaSeconds(unsigned long now, const char** src) {
+  float r = currentRate(src);
+  if (r <= 0) return -1;
+  float hours = (now - stateSince) / 3600000.0f;
+  float remaining;
+  if (state == LOW_LEVEL)  remaining = max(0.0f, cfg.mlBetween - r * hours) + cfg.mlBelow;
+  else if (state == EMPTY) remaining = max(0.0f, cfg.mlBelow - r * hours);
+  else return -1;
+  return (long)(remaining / r * 3600);
+}
+
+String durationText(long s) {
+  if (s < 60) return "不到 1 分鐘";
+  long m = (s + 30) / 60;
+  if (m < 60) return "約 " + String(m) + " 分鐘";
+  return "約 " + String(m / 60) + " 小時 " + String(m % 60) + " 分";
 }
 
 // ===== 已綁定手機的儲存（存在快閃記憶體，斷電不會消失）=====
@@ -178,17 +323,36 @@ void removeSub(const String& endpoint) {
   xSemaphoreGive(subsLock);
 }
 
-// ===== 網頁 =====
-// 手機網頁內容在 index_html.h（由 phone.html 產生），配對頁在 pair_html.h
+// 配對碼檢查：設定了配對碼才需要；連續錯 5 次鎖 60 秒
+// 回傳 nullptr = 通過，否則為錯誤訊息
+const char* checkPin(const String& given) {
+  if (!cfg.pin.length()) return nullptr;
+  if (millis() < pinLockUntil) return "錯誤次數太多，請 1 分鐘後再試";
+  if (given == cfg.pin) { pinFails = 0; return nullptr; }
+  if (++pinFails >= 5) { pinFails = 0; pinLockUntil = millis() + 60000; }
+  return given.length() ? "配對碼錯誤" : "需要配對碼";
+}
 
-void handleRoot() { server.send_P(200, "text/html; charset=utf-8", INDEX_HTML); }
-void handlePair() { server.send_P(200, "text/html; charset=utf-8", PAIR_HTML); }
+// ===== 網頁 =====
+// 監控頁在 index_html.h（由 phone.html 產生），配對頁在 pair_html.h，設定頁在 settings_html.h
+
+void handleRoot()     { server.send_P(200, "text/html; charset=utf-8", INDEX_HTML); }
+void handlePair()     { server.send_P(200, "text/html; charset=utf-8", PAIR_HTML); }
+void handleSettings() { server.send_P(200, "text/html; charset=utf-8", SETTINGS_HTML); }
+
+void sendJson(const String& json) {
+  server.sendHeader("Access-Control-Allow-Origin", "*");
+  server.send(200, "application/json; charset=utf-8", json);
+}
 
 void handleStatus() {
   unsigned long now = millis();
   bool muted = now < mutedUntil;
+  const char* src;
+  long eta = etaSeconds(now, &src);
+  float rate = currentRate(&src);
   String json = "{";
-  json += "\"bed\":\"" + jsonEscape(BED_NAME) + "\",";
+  json += "\"bed\":\"" + jsonEscape(cfg.bed) + "\",";
   json += "\"state\":\"" + String(STATE_KEY[state]) + "\",";
   json += "\"text\":\"" + String(STATE_TEXT[state]) + "\",";
   json += "\"upper\":" + String(upper.stable ? "true" : "false") + ",";
@@ -196,25 +360,43 @@ void handleStatus() {
   json += "\"muted\":" + String(muted ? "true" : "false") + ",";
   json += "\"muteLeft\":" + String(muted ? (mutedUntil - now) / 1000 : 0) + ",";
   json += "\"since\":" + String((now - stateSince) / 1000) + ",";
+  json += "\"eta\":" + String(eta) + ",";
+  json += "\"rate\":" + String((int)(rate + 0.5f)) + ",";
+  json += "\"rateSrc\":\"" + String(src) + "\",";
   json += "\"push\":" + String((unsigned)subs.size()) + ",";
-  json += "\"ap\":" + String(WiFi.getMode() == WIFI_AP ? "true" : "false") + ",";
-  json += "\"rssi\":" + String(WiFi.getMode() == WIFI_AP ? 0 : WiFi.RSSI());
+  json += "\"host\":\"" + jsonEscape(cfg.host) + "\",";
+  json += "\"ap\":" + String(apMode ? "true" : "false") + ",";
+  json += "\"rssi\":" + String(apMode ? 0 : WiFi.RSSI());
   json += "}";
-  server.sendHeader("Access-Control-Allow-Origin", "*");
-  server.send(200, "application/json", json);
+  sendJson(json);
+}
+
+void handleHistory() {
+  String json = "{\"now\":" + String(nowEpoch()) + ",\"items\":[";
+  for (size_t i = historyCount; i-- > 0;) {
+    const BagRecord& r = history[i];
+    json += "{\"s\":" + String(r.startAt) + ",\"l\":" + String(r.lowAt) + ",\"e\":" + String(r.emptyAt) +
+            ",\"a\":" + String(r.ackAt) + ",\"d\":" + String(r.doneAt) + "}";
+    if (i) json += ",";
+  }
+  sendJson(json + "]}");
 }
 
 void handleMute() {
   // 第二階段只允許短暫靜音，避免警報被長時間關閉
   unsigned long dur = (state == EMPTY) ? MUTE_STAGE2_MS : MUTE_STAGE1_MS;
-  if (state != NORMAL) mutedUntil = millis() + dur;
+  if (state != NORMAL) {
+    mutedUntil = millis() + dur;
+    if ((state == LOW_LEVEL || state == EMPTY) && !cur.ackAt) cur.ackAt = nowEpoch();  // 記錄確認時間
+  }
   server.send(200, "text/plain", "ok");
 }
 
-void replyJson(bool ok, const char* error) {
-  String j = String("{\"ok\":") + (ok ? "true" : "false") + ",\"bed\":\"" + jsonEscape(BED_NAME) + "\"";
+void replyJson(bool ok, const char* error, bool needPin = false) {
+  String j = String("{\"ok\":") + (ok ? "true" : "false") + ",\"bed\":\"" + jsonEscape(cfg.bed) + "\"";
   if (error) j += String(",\"error\":\"") + error + "\"";
-  server.send(200, "application/json", j + "}");
+  if (needPin) j += ",\"needPin\":true";
+  sendJson(j + "}");
 }
 
 void queueNotice(uint8_t st, const char* body, bool welcome = false);
@@ -223,6 +405,7 @@ void handleSubscribe() {
   String e = server.arg("endpoint"), k = server.arg("p256dh"), a = server.arg("auth");
   uint8_t buf[70];
   if (!vapidReady) return replyJson(false, "裝置尚未設定推播金鑰（請執行 make_vapid.ps1 後重新燒錄）");
+  if (const char* err = checkPin(server.arg("pin"))) return replyJson(false, err, true);
   if (e.length() > 700 || !webpush::endpointAllowed(e)) return replyJson(false, "不支援這個瀏覽器的推播服務");
   if (webpush::b64urlDecode(k, buf, sizeof(buf)) != 65 || webpush::b64urlDecode(a, buf, sizeof(buf)) != 16)
     return replyJson(false, "訂閱資料格式錯誤");
@@ -257,6 +440,85 @@ void handlePushTest() {
   replyJson(true, nullptr);
 }
 
+// 目前設定（不含密碼與配對碼本身）
+void handleConfigGet() {
+  String json = "{";
+  json += "\"bed\":\"" + jsonEscape(cfg.bed) + "\",";
+  json += "\"host\":\"" + jsonEscape(cfg.host) + "\",";
+  json += "\"ssid\":\"" + jsonEscape(wifiSsid()) + "\",";
+  json += "\"pinSet\":" + String(cfg.pin.length() ? "true" : "false") + ",";
+  json += "\"mlBetween\":" + String(cfg.mlBetween) + ",";
+  json += "\"mlBelow\":" + String(cfg.mlBelow) + ",";
+  json += "\"rate\":" + String(cfg.rateMlH) + ",";
+  json += "\"lastRate\":" + String((int)(lastRate + 0.5f)) + ",";
+  json += "\"ip\":\"" + (apMode ? WiFi.softAPIP() : WiFi.localIP()).toString() + "\",";
+  json += "\"ap\":" + String(apMode ? "true" : "false");
+  sendJson(json + "}");
+}
+
+bool validHost(const String& h) {
+  if (h.length() < 1 || h.length() > 30 || h[0] == '-' || h[h.length() - 1] == '-') return false;
+  for (char c : h) if (!(isdigit(c) || (c >= 'a' && c <= 'z') || c == '-')) return false;
+  return true;
+}
+
+void handleConfigPost() {
+  if (const char* err = checkPin(server.arg("auth"))) return replyJson(false, err, true);
+
+  String bed = server.arg("bed"), host = server.arg("host"), ssid = server.arg("ssid"), pin = server.arg("pin");
+  bed.trim(); host.trim(); host.toLowerCase(); ssid.trim(); pin.trim();
+  int mlBetween = server.arg("mlBetween").toInt(), mlBelow = server.arg("mlBelow").toInt();
+  int rate = server.arg("rate").toInt();
+
+  if (!bed.length() || bed.length() > 60) return replyJson(false, "床位名稱請輸入 1–20 個字");
+  if (!validHost(host)) return replyJson(false, "裝置網址只能用小寫英文、數字和 -");
+  if (ssid.length() > 32) return replyJson(false, "Wi-Fi 名稱太長");
+  if (pin.length() && (pin.length() < 4 || pin.length() > 8)) return replyJson(false, "配對碼請設 4–8 位數字");
+  for (char c : pin) if (!isdigit(c)) return replyJson(false, "配對碼只能用數字");
+  if (mlBetween < 1 || mlBetween > 2000 || mlBelow < 1 || mlBelow > 2000) return replyJson(false, "液量請輸入 1–2000 ml");
+  if (rate < 0 || rate > 2000) return replyJson(false, "滴速請輸入 0–2000 ml/小時");
+
+  bool netChanged = host != cfg.host || ssid != String(wifiSsid()) || server.arg("pass").length() > 0;
+  cfg.bed = bed;
+  cfg.host = host;
+  if (ssid != String(wifiSsid()) || server.arg("pass").length()) {
+    cfg.ssid = ssid;
+    if (server.arg("pass").length()) cfg.pass = server.arg("pass");
+  }
+  if (server.arg("clearPin") == "1") cfg.pin = "";
+  else if (pin.length()) cfg.pin = pin;
+  cfg.mlBetween = mlBetween;
+  cfg.mlBelow = mlBelow;
+  cfg.rateMlH = rate;
+  saveConfig();
+  Serial.println("[設定] 已儲存");
+
+  if (netChanged) restartAt = millis() + 1500;  // 回應送出後再重新開機
+  sendJson(String("{\"ok\":true,\"restart\":") + (netChanged ? "true" : "false") + "}");
+}
+
+// 非同步掃描附近 Wi-Fi，避免卡住警報
+void handleScan() {
+  int n = WiFi.scanComplete();
+  if (n == WIFI_SCAN_FAILED) { WiFi.scanNetworks(true); return sendJson("{\"scanning\":true}"); }
+  if (n == WIFI_SCAN_RUNNING) return sendJson("{\"scanning\":true}");
+  String json = "{\"scanning\":false,\"list\":[";
+  bool first = true;
+  for (int i = 0; i < n; i++) {
+    String s = WiFi.SSID(i);
+    if (!s.length()) continue;
+    bool dup = false;
+    for (int j = 0; j < i; j++) if (WiFi.SSID(j) == s) { dup = true; break; }
+    if (dup) continue;
+    if (!first) json += ",";
+    first = false;
+    json += "{\"ssid\":\"" + jsonEscape(s) + "\",\"rssi\":" + String(WiFi.RSSI(i)) +
+            ",\"lock\":" + String(WiFi.encryptionType(i) != WIFI_AUTH_OPEN ? "true" : "false") + "}";
+  }
+  WiFi.scanDelete();
+  sendJson(json + "]}");
+}
+
 // ===== 推播通知 =====
 // HTTPS 連線要 1–3 秒，放在獨立工作執行，蜂鳴器與網頁才不會卡住
 QueueHandle_t noticeQueue;
@@ -285,7 +547,7 @@ void sendWebPush(const Notice& n) {
   if (targets.empty()) return;
 
   // 手機上的推播網頁依照這些欄位顯示通知與紀錄
-  String payload = "{\"bed\":\"" + jsonEscape(BED_NAME) + "\",\"state\":\"" +
+  String payload = "{\"bed\":\"" + jsonEscape(cfg.bed) + "\",\"state\":\"" +
                    (n.welcome ? "test" : STATE_KEY[n.state]) + "\",\"body\":\"" + jsonEscape(n.body) +
                    "\",\"url\":\"http://" + WiFi.localIP().toString() + "/\",\"t\":" +
                    String((unsigned long)time(nullptr)) + "}";
@@ -298,8 +560,8 @@ void sendWebPush(const Notice& n) {
 
 void sendTelegram(const Notice& n) {
   if (n.welcome || !strlen(TG_TOKEN) || !strlen(TG_CHAT_ID)) return;
-  String text = String(STATE_EMOJI[n.state]) + " " + BED_NAME + "\n" + n.body;
-  String j = "{\"chat_id\":\"" + jsonEscape(TG_CHAT_ID) + "\",\"text\":\"" + jsonEscape(text.c_str()) + "\"}";
+  String text = String(STATE_EMOJI[n.state]) + " " + cfg.bed + "\n" + n.body;
+  String j = "{\"chat_id\":\"" + jsonEscape(TG_CHAT_ID) + "\",\"text\":\"" + jsonEscape(text) + "\"}";
   String url = String("https://api.telegram.org/bot") + TG_TOKEN + "/sendMessage";
   for (int i = 0; i < 2 && !postJson("Telegram", url, j); i++) delay(3000);
 }
@@ -346,6 +608,7 @@ bool ensureTime() {
 }
 
 void notifyTask(void*) {
+  if (!apMode) ensureTime();  // 開機先校時，更換紀錄才有正確時間
   Notice n;
   for (;;) {
     if (xQueueReceive(noticeQueue, &n, portMAX_DELAY) != pdTRUE) continue;
@@ -368,42 +631,56 @@ void queueNotice(uint8_t st, const char* body, bool welcome) {
   xQueueSend(noticeQueue, &n, 0);  // 佇列滿就丟棄，不阻塞主迴圈
 }
 
-void announce(DripState next, DripState prev) {
+// 狀態已更新後呼叫，訊息會附上預估剩餘時間
+void announce(DripState next, DripState prev, unsigned long now) {
+  const char* src;
+  long eta = etaSeconds(now, &src);
+  String msg;
   switch (next) {
     case LOW_LEVEL:
-      if (prev == EMPTY) break;  // 液位不會自己變多，多半是晃動，不重複通知
-      queueNotice(next, "第一階段：液量偏低，請準備更換點滴。");
+      if (prev == EMPTY) return;  // 液位不會自己變多，多半是晃動，不重複通知
+      msg = "第一階段：液量偏低，請準備更換點滴。";
+      if (eta >= 0) msg += "預計" + durationText(eta) + "後耗盡。";
       break;
     case EMPTY:
-      queueNotice(next, "第二階段：點滴即將耗盡，請立即更換！");
-      lastEmptyNotice = millis();
+      msg = "第二階段：點滴即將耗盡，請立即更換！";
+      if (eta >= 0) msg += "預計" + durationText(eta) + "後滴完。";
+      lastEmptyNotice = now;
       break;
     case SENSOR_FAULT:
-      queueNotice(next, "感測器讀值異常，請檢查安裝位置。");
+      msg = "感測器讀值異常，請檢查安裝位置。";
       break;
     case NORMAL:
-      if (prev == NORMAL) break;
-      queueNotice(next, "液位已恢復正常（已更換或已排除）。");
+      if (prev == NORMAL) return;
+      msg = "液位已恢復正常（已更換或已排除）。";
       break;
   }
+  queueNotice(next, msg.c_str());
 }
 
 void setupWiFi() {
   WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  Serial.print("連線 Wi-Fi");
+  WiFi.setHostname(cfg.host.c_str());
+  WiFi.begin(wifiSsid(), wifiPass());
+  Serial.printf("連線 Wi-Fi「%s」", wifiSsid());
   unsigned long start = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - start < 15000) {
     delay(300);
     Serial.print(".");
   }
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.printf("\n已連線，手機開啟 http://%s\n", WiFi.localIP().toString().c_str());
-    configTime(0, 0, "pool.ntp.org", "time.google.com");  // 推播簽章需要正確時間
+    configTime(0, 0, "pool.ntp.org", "time.google.com");  // 推播簽章與紀錄需要正確時間
+    if (MDNS.begin(cfg.host.c_str())) MDNS.addService("http", "tcp", 80);
+    Serial.printf("\n已連線，手機開啟 http://%s.local 或 http://%s\n", cfg.host.c_str(),
+                  WiFi.localIP().toString().c_str());
   } else {
-    WiFi.mode(WIFI_AP);
+    // 熱點模式同時保留 STA，設定頁才能掃描附近的 Wi-Fi
+    apMode = true;
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_AP_STA);
     WiFi.softAP(AP_SSID, AP_PASS);
-    Serial.printf("\n改用熱點 %s，手機開啟 http://%s\n", AP_SSID, WiFi.softAPIP().toString().c_str());
+    Serial.printf("\n連不上 Wi-Fi，改用熱點 %s，手機開啟 http://%s/settings 設定網路\n", AP_SSID,
+                  WiFi.softAPIP().toString().c_str());
   }
 }
 
@@ -420,30 +697,39 @@ void setup() {
   digitalWrite(PIN_BUZZER, HIGH); delay(150); digitalWrite(PIN_BUZZER, LOW);
   delay(350);
 
+  loadConfig();
+  loadHistory();
+
   upper.stable = upper.lastRaw = readLiquid(PIN_SENSOR_UPPER);
   lower.stable = lower.lastRaw = readLiquid(PIN_SENSOR_LOWER);
   state = evaluate();
   stateSince = millis();
+  if (state == LOW_LEVEL || state == EMPTY) cur = { lastDoneAt, 0, 0, 0, 0 };
 
   uint8_t keyBuf[40];
   vapidReady = webpush::b64urlDecode(VAPID_PRIVATE, keyBuf, sizeof(keyBuf)) == 32;
   if (vapidReady) memcpy(vapidPriv, keyBuf, 32);
-  if (!vapidReady) Serial.println("[推播] 未設定 VAPID 金鑰，請執行 make_vapid.ps1 後重新燒錄");
+  else Serial.println("[推播] 未設定 VAPID 金鑰，請執行 make_vapid.ps1 後重新燒錄");
   subsLock = xSemaphoreCreateMutex();
   loadSubs();
 
   setupWiFi();
   noticeQueue = xQueueCreate(8, sizeof(Notice));
   xTaskCreate(notifyTask, "notify", 16384, nullptr, 1, nullptr);  // 加密 + TLS 需要較大堆疊
-  if (state != NORMAL) announce(state, NORMAL);  // 開機時就已偏低也要通知
+  if (state != NORMAL) announce(state, NORMAL, millis());  // 開機時就已偏低也要通知
 
   server.on("/", handleRoot);
   server.on("/status", handleStatus);
+  server.on("/history", handleHistory);
   server.on("/mute", HTTP_POST, handleMute);
   server.on("/pair", handlePair);
   server.on("/subscribe", HTTP_POST, handleSubscribe);
   server.on("/unsubscribe", HTTP_POST, handleUnsubscribe);
   server.on("/pushtest", HTTP_POST, handlePushTest);
+  server.on("/settings", handleSettings);
+  server.on("/config", HTTP_GET, handleConfigGet);
+  server.on("/config", HTTP_POST, handleConfigPost);
+  server.on("/scan", handleScan);
   server.begin();
 }
 
@@ -456,19 +742,20 @@ void loop() {
 
   DripState next = evaluate();
   if (next != state) {
+    DripState prev = state;
     // 狀態升級（更嚴重）時取消靜音，確保新警報一定響
-    if (next > state) mutedUntil = 0;
-    Serial.printf("[狀態] %s -> %s\n", STATE_TEXT[state], STATE_TEXT[next]);
-    announce(next, state);
+    if (next > prev) mutedUntil = 0;
+    Serial.printf("[狀態] %s -> %s\n", STATE_TEXT[prev], STATE_TEXT[next]);
     state = next;
     stateSince = now;
+    trackBag(next, prev, now);
+    announce(next, prev, now);
   }
 
   // 第二階段一直沒人處理（也沒按靜音）就重複推播
   if (state == EMPTY && now >= mutedUntil && now - lastEmptyNotice >= REPEAT_EMPTY_MS) {
-    char body[160];
-    snprintf(body, sizeof(body), "點滴耗盡已持續 %lu 分鐘，仍未處理！", (now - stateSince) / 60000);
-    queueNotice(EMPTY, body);
+    String msg = "點滴耗盡已持續" + durationText((now - stateSince) / 1000) + "，仍未處理！";
+    queueNotice(EMPTY, msg.c_str());
     lastEmptyNotice = now;
   }
 
@@ -484,10 +771,12 @@ void loop() {
                   STATE_TEXT[state]);
   }
 
-  // Wi-Fi 斷線自動重連（STA 模式）
+  // Wi-Fi 斷線自動重連
   static unsigned long lastCheck = 0;
-  if (WiFi.getMode() == WIFI_STA && now - lastCheck > 10000) {
+  if (!apMode && now - lastCheck > 10000) {
     lastCheck = now;
     if (WiFi.status() != WL_CONNECTED) WiFi.reconnect();
   }
+
+  if (restartAt && now >= restartAt) ESP.restart();
 }
