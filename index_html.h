@@ -65,7 +65,8 @@ h2{font-size:15px;margin:0 0 12px;color:var(--sub);font-weight:600}
 .eta{margin:12px 0 0;padding-top:12px;border-top:1px solid color-mix(in srgb,var(--c) 25%,transparent);
   font-size:16px;font-weight:800;color:var(--ci);line-height:1.4}
 .eta small{display:block;margin-top:2px;font-size:13px;font-weight:500;color:var(--sub)}
-.gear{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--surface);box-shadow:var(--shadow);color:var(--sub);flex:none}
+.round{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--surface);box-shadow:var(--shadow);color:var(--sub);flex:none}
+.lang{font:inherit;font-size:14px;font-weight:700;border:0;cursor:pointer;color:var(--blue)}
 .gear .ic{width:22px;height:22px}
 .hist{list-style:none;margin:0;padding:0}
 .hist li{padding:10px 0;border-top:1px solid var(--line)}
@@ -89,7 +90,7 @@ h2{font-size:15px;margin:0 0 12px;color:var(--sub);font-weight:600}
 .stages li.done::before{background:color-mix(in srgb,var(--c) 45%,var(--line))}
 .stages li.now{color:var(--ink)}
 .stages li.now::before{background:var(--c)}
-.stages li.now::after{content:"目前";position:absolute;top:-8px;left:50%;transform:translateX(-50%);
+.stages li.now::after{content:attr(data-now);position:absolute;top:-8px;left:50%;transform:translateX(-50%);
   font-size:11px;padding:1px 8px;border-radius:999px;background:var(--c);color:#fff}
 
 /* 按鈕 */
@@ -151,10 +152,12 @@ h2{font-size:15px;margin:0 0 12px;color:var(--sub);font-weight:600}
   <symbol id="i-phone" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></symbol>
 </svg>
 
+
 <header>
-  <div class="t"><small id="addr">點滴監控</small><h1 id="bed">連線中…</h1></div>
-  <span class="chip" id="conn"><span class="live"></span><span id="connText">連線中</span><span class="bars" id="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span></span>
-  <a class="gear" id="gear" href="/settings" aria-label="裝置設定"><svg class="ic" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></a>
+  <div class="t"><small id="addr" data-i="appName">點滴監控</small><h1 id="bed" data-i="connectingDots">連線中…</h1></div>
+  <span class="chip" id="conn"><span class="live"></span><span id="connText" data-i="connecting">連線中</span><span class="bars" id="bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span></span>
+  <button class="round lang" id="langBtn" type="button" aria-label="切換語言 Switch language">EN</button>
+  <a class="round gear" id="gear" href="/settings" data-ia="settings" aria-label="裝置設定"><svg class="ic" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></a>
 </header>
 
 <main>
@@ -170,8 +173,8 @@ h2{font-size:15px;margin:0 0 12px;color:var(--sub);font-weight:600}
       <path d="M30 22h80q14 0 14 14v108q0 26-26 36H42q-26-10-26-36V36q0-14 14-14z" fill="none" stroke="var(--sub)" stroke-width="3"/>
       <line x1="16" y1="82" x2="124" y2="82" stroke="var(--sub)" stroke-width="1.5" stroke-dasharray="4 4" opacity=".7"/>
       <line x1="16" y1="142" x2="124" y2="142" stroke="var(--sub)" stroke-width="1.5" stroke-dasharray="4 4" opacity=".7"/>
-      <text x="22" y="77" font-size="11" font-weight="700" fill="var(--sub)">上位</text>
-      <text x="22" y="137" font-size="11" font-weight="700" fill="var(--sub)">下位</text>
+      <text x="22" y="77" font-size="11" font-weight="700" fill="var(--sub)" data-i="upper">上位</text>
+      <text x="22" y="137" font-size="11" font-weight="700" fill="var(--sub)" data-i="lower">下位</text>
       <rect x="121" y="72" width="18" height="20" rx="5" fill="var(--surface)" stroke="var(--sub)" stroke-width="2"/>
       <circle id="dotU" cx="130" cy="82" r="4.5" fill="var(--off)"/>
       <rect x="121" y="132" width="18" height="20" rx="5" fill="var(--surface)" stroke="var(--sub)" stroke-width="2"/>
@@ -182,66 +185,66 @@ h2{font-size:15px;margin:0 0 12px;color:var(--sub);font-weight:600}
       <path d="M70 221v11" stroke="var(--sub)" stroke-width="3"/>
     </svg>
     <div class="info">
-      <p class="eyebrow"><svg class="ic" id="stIcon"><use href="#i-clock"/></svg><span id="eyebrow">取得狀態中</span></p>
-      <h2 id="st">連線中…</h2>
-      <p class="hint" id="hint">正在連線到點滴監測裝置</p>
+      <p class="eyebrow"><svg class="ic" id="stIcon"><use href="#i-clock"/></svg><span id="eyebrow" data-i="loading">取得狀態中</span></p>
+      <h2 id="st" data-i="connectingDots">連線中…</h2>
+      <p class="hint" id="hint" data-i="connectingHint">正在連線到點滴監測裝置</p>
       <span class="since"><svg class="ic"><use href="#i-clock"/></svg><span id="since">—</span></span>
       <p class="eta" id="eta" hidden></p>
     </div>
   </section>
 
-  <ol class="stages" id="stages" aria-label="液位階段">
-    <li data-k="normal">充足</li><li data-k="low">偏低</li><li data-k="empty">耗盡</li>
+  <ol class="stages" id="stages" data-ia="stages" aria-label="液位階段">
+    <li data-i="stage_normal">充足</li><li data-i="stage_low">偏低</li><li data-i="stage_empty">耗盡</li>
   </ol>
 
   <section class="card">
     <button class="btn dark" id="muteBtn" type="button" onclick="mute()" disabled>
-      <svg class="ic"><use href="#i-mute"/></svg><span id="muteText">靜音現場警報</span><span class="meter" id="meter" style="width:0"></span>
+      <svg class="ic"><use href="#i-mute"/></svg><span id="muteText" data-i="mute">靜音現場警報</span><span class="meter" id="meter" style="width:0"></span>
     </button>
     <button class="btn soft" id="soundBtn" type="button" onclick="enableSound()">
-      <svg class="ic"><use href="#i-sound"/></svg><span id="soundText">開啟這頁的提示音</span>
+      <svg class="ic"><use href="#i-sound"/></svg><span id="soundText" data-i="soundOn">開啟這頁的提示音</span>
     </button>
   </section>
 
   <section class="card">
-    <h2>感測器</h2>
+    <h2 data-i="sensors">感測器</h2>
     <div class="sensors">
-      <div class="sensor" id="u"><b>上位</b><span><i class="dot"></i><em id="uText" style="font-style:normal">—</em></span></div>
-      <div class="sensor" id="l"><b>下位</b><span><i class="dot"></i><em id="lText" style="font-style:normal">—</em></span></div>
+      <div class="sensor" id="u"><b data-i="upper">上位</b><span><i class="dot"></i><em id="uText" style="font-style:normal">—</em></span></div>
+      <div class="sensor" id="l"><b data-i="lower">下位</b><span><i class="dot"></i><em id="lText" style="font-style:normal">—</em></span></div>
     </div>
-    <div class="meta"><span>現場蜂鳴器</span><b id="m">—</b></div>
+    <div class="meta"><span data-i="buzzer">現場蜂鳴器</span><b id="m">—</b></div>
   </section>
 
   <section class="card push">
     <span class="badge" id="pushBadge"><svg class="ic"><use href="#i-phone"/></svg></span>
     <div class="body">
-      <b id="pushTitle">手機推播</b>
-      <p class="sub" id="pushInfo">手機鎖定時也能收到警報。</p>
+      <b id="pushTitle" data-i="push">手機推播</b>
+      <p class="sub" id="pushInfo" data-i="pushOffInfo">手機鎖定時也能收到警報。</p>
       <a class="btn soft" href="https://youenc120-ux.github.io/smart-iv-drip-alert/" target="_blank" rel="noopener">
-        <svg class="ic"><use href="#i-bell"/></svg>設定推播</a>
-      <button class="btn soft" id="pushTestBtn" type="button" onclick="pushTest()" hidden>傳送測試推播</button>
+        <svg class="ic"><use href="#i-bell"/></svg><span data-i="pushSetup">設定推播</span></a>
+      <button class="btn soft" id="pushTestBtn" type="button" onclick="pushTest()" data-i="pushTest" hidden>傳送測試推播</button>
     </div>
   </section>
 
   <section class="card">
-    <h2>事件紀錄</h2>
-    <ul class="log" id="log"><li style="padding-left:0"><p class="empty-note" style="width:100%">尚無事件</p></li></ul>
+    <h2 data-i="events">事件紀錄</h2>
+    <ul class="log" id="log"></ul>
   </section>
 
   <section class="card">
-    <h2>更換紀錄</h2>
-    <ul class="hist" id="hist"><li class="empty-note">讀取中…</li></ul>
+    <h2 data-i="history">更換紀錄</h2>
+    <ul class="hist" id="hist"><li class="empty-note" data-i="loadingDots">讀取中…</li></ul>
   </section>
 
   <section class="card demo" id="demo">
-    <h2>展示模式：點按切換模擬狀態</h2>
+    <h2 data-i="demoTitle">展示模式：點按切換模擬狀態</h2>
     <div class="row">
-      <button class="btn soft" data-s="normal">充足</button><button class="btn soft" data-s="low">偏低</button>
-      <button class="btn soft" data-s="empty">耗盡</button><button class="btn soft" data-s="fault">異常</button>
+      <button class="btn soft" data-s="normal" data-i="stage_normal">充足</button><button class="btn soft" data-s="low" data-i="stage_low">偏低</button>
+      <button class="btn soft" data-s="empty" data-i="stage_empty">耗盡</button><button class="btn soft" data-s="fault" data-i="stage_fault">異常</button>
     </div>
   </section>
 
-  <p class="foot">智慧點滴注射預警系統・專題原型，非醫療器材</p>
+  <p class="foot" data-i="foot">智慧點滴注射預警系統・專題原型，非醫療器材</p>
 </main>
 
 <script>
@@ -249,92 +252,152 @@ const $ = (id) => document.getElementById(id);
 // 用電腦直接開檔案、在 GitHub Pages 上，或網址加 ?demo，就進入展示模式（不需要硬體）
 const DEMO = !location.protocol.startsWith('http') || location.hostname.endsWith('github.io') || location.search.includes('demo');
 
-const INFO = {
-  normal:  { eyebrow: '一切正常', icon: 'check', hint: '液量充足，持續監測中',   y: 46,  stage: 0, drip: true },
-  low:     { eyebrow: '請注意',   icon: 'alert', hint: '請準備更換點滴',         y: 108, stage: 1, drip: true },
-  empty:   { eyebrow: '緊急',     icon: 'bell',  hint: '請立即更換點滴！',       y: 160, stage: 2, drip: false },
-  fault:   { eyebrow: '需要檢查', icon: 'alert', hint: '請檢查感測器安裝位置',   y: 108, stage: -1, drip: false },
-  offline: { eyebrow: '連線中斷', icon: 'off',   hint: '請確認裝置電源與 Wi-Fi', y: 108, stage: -1, drip: false },
+// ===== 中英文字 =====
+const L = {
+  zh: {
+    appName: '點滴監控', connecting: '連線中', connectingDots: '連線中…', live: '即時', offline: '離線', hotspot: '熱點模式',
+    hotspotAddr: '熱點模式・192.168.4.1', settings: '裝置設定', loading: '取得狀態中', loadingDots: '讀取中…',
+    connectingHint: '正在連線到點滴監測裝置', now: '目前', upper: '上位', lower: '下位', stages: '液位階段',
+    stage_normal: '充足', stage_low: '偏低', stage_empty: '耗盡', stage_fault: '異常',
+    st_normal: '液量充足', st_low: '第一階段：液量偏低', st_empty: '第二階段：請立即更換', st_fault: '感測器異常', st_offline: '裝置離線',
+    eb_normal: '一切正常', eb_low: '請注意', eb_empty: '緊急', eb_fault: '需要檢查', eb_offline: '連線中斷',
+    h_normal: '液量充足，持續監測中', h_low: '請準備更換點滴', h_empty: '請立即更換點滴！', h_fault: '請檢查感測器安裝位置', h_offline: '請確認裝置電源與 Wi-Fi',
+    mute: '靜音現場警報', muted: (s) => `已靜音・${s} 秒`, soundOn: '開啟這頁的提示音', soundDone: '這頁的提示音已開啟',
+    sensors: '感測器', liquid: '有液體', noLiquid: '無液體', buzzer: '現場蜂鳴器', bzMuted: '靜音中', bzIdle: '待命', bzAlarm: '警報中',
+    push: '手機推播', pushLinked: (n) => `已綁定 ${n} 支手機`, pushOnInfo: '警報會即時推播，手機鎖定也收得到。',
+    pushOffInfo: '尚未綁定手機。設定後，手機鎖定時也能收到警報。', pushSetup: '設定推播', pushTest: '傳送測試推播', pushSent: '已送出，幾秒內會收到',
+    events: '事件紀錄', noEvents: '尚無事件', lostConn: '與裝置失去連線', history: '更換紀錄',
+    noHistory: '尚無紀錄。點滴偏低、更換完成後會自動記錄在這裡。', demoTitle: '展示模式：點按切換模擬狀態',
+    foot: '智慧點滴注射預警系統・專題原型，非醫療器材', demoBed: '301 病房 A 床', lastUpdate: (c) => `最後更新 ${c}`,
+    since: (h, m, s) => h ? `已持續 ${h} 小時 ${m} 分` : m ? `已持續 ${m} 分 ${s} 秒` : `已持續 ${s} 秒`,
+    dur: (s) => { if (s < 60) return '不到 1 分鐘'; const m = Math.round(s / 60); return m < 60 ? `約 ${m} 分鐘` : `約 ${Math.floor(m / 60)} 小時 ${m % 60} 分`; },
+    etaUnknown: '無法預估剩餘時間', etaHint: '在「設定」填入醫囑滴速即可預估', etaDone: '應已滴完，請立即處理',
+    eta_low: (d) => `預計${d}後耗盡`, eta_empty: (d) => `預計${d}後滴完`,
+    src_measured: '依這袋實測滴速', src_set: '依醫囑滴速', src_last: '依上一袋實測滴速', perHour: (r) => `每小時約 ${r} ml`,
+    replaced: (d) => `${d} 更換`, unknownTime: '時間未知', used: (d) => `這袋使用 ${d}`,
+    acked: (d) => `警報後 ${d}確認`, done: (d) => `警報後 ${d}完成更換`, sep: '・',
+  },
+  en: {
+    appName: 'IV Monitor', connecting: 'Connecting', connectingDots: 'Connecting…', live: 'Live', offline: 'Offline', hotspot: 'Hotspot',
+    hotspotAddr: 'Hotspot · 192.168.4.1', settings: 'Device settings', loading: 'Loading', loadingDots: 'Loading…',
+    connectingHint: 'Connecting to the IV monitor', now: 'Now', upper: 'Upper', lower: 'Lower', stages: 'Level stages',
+    stage_normal: 'Full', stage_low: 'Low', stage_empty: 'Empty', stage_fault: 'Fault',
+    st_normal: 'Level OK', st_low: 'Stage 1: Level low', st_empty: 'Stage 2: Replace now', st_fault: 'Sensor fault', st_offline: 'Device offline',
+    eb_normal: 'All good', eb_low: 'Attention', eb_empty: 'Urgent', eb_fault: 'Check needed', eb_offline: 'Disconnected',
+    h_normal: 'Plenty left, monitoring', h_low: 'Prepare a replacement bag', h_empty: 'Replace the IV bag now!', h_fault: 'Check the sensor placement', h_offline: 'Check device power and Wi-Fi',
+    mute: 'Silence alarm', muted: (s) => `Silenced · ${s}s`, soundOn: 'Enable sounds on this page', soundDone: 'Page sounds on',
+    sensors: 'Sensors', liquid: 'Liquid', noLiquid: 'No liquid', buzzer: 'Buzzer', bzMuted: 'Silenced', bzIdle: 'Standby', bzAlarm: 'Alarming',
+    push: 'Phone alerts', pushLinked: (n) => `${n} phone${n > 1 ? 's' : ''} linked`, pushOnInfo: 'Alerts are pushed instantly, even to a locked phone.',
+    pushOffInfo: 'No phone linked yet. Once set up, alerts reach the phone even when it is locked.', pushSetup: 'Set up alerts', pushTest: 'Send test alert', pushSent: 'Sent, arriving in a few seconds',
+    events: 'Events', noEvents: 'No events yet', lostConn: 'Lost connection to device', history: 'Replacement log',
+    noHistory: 'No records yet. Each bag replaced after a low-level alert is logged here.', demoTitle: 'Demo mode: tap to simulate a state',
+    foot: 'Smart IV Drip Alert · student prototype, not a medical device', demoBed: 'Room 301 Bed A', lastUpdate: (c) => `Last update ${c}`,
+    since: (h, m, s) => h ? `For ${h} h ${m} min` : m ? `For ${m} min ${s} s` : `For ${s} s`,
+    dur: (s) => { if (s < 60) return 'under 1 min'; const m = Math.round(s / 60); return m < 60 ? `~${m} min` : `~${Math.floor(m / 60)} h ${m % 60} min`; },
+    etaUnknown: "Can't estimate time left", etaHint: 'Enter the prescribed rate in Settings', etaDone: 'Should be finished, act now',
+    eta_low: (d) => `Empty in ${d}`, eta_empty: (d) => `Finishes in ${d}`,
+    src_measured: "Based on this bag's measured rate", src_set: 'Based on the prescribed rate', src_last: "Based on the last bag's rate", perHour: (r) => `~${r} ml/h`,
+    replaced: (d) => `Replaced ${d}`, unknownTime: 'Time unknown', used: (d) => `Bag lasted ${d}`,
+    acked: (d) => `acknowledged ${d} after alert`, done: (d) => `replaced ${d} after alert`, sep: ' · ',
+  },
 };
-const TEXT = { normal: '液量充足', low: '第一階段：液量偏低', empty: '第二階段：請立即更換', fault: '感測器異常' };
+let lang = (() => { try { return localStorage.getItem('lang'); } catch { return null; } })() || (/^zh/i.test(navigator.language) ? 'zh' : 'en');
+function t(k, ...a) { const v = L[lang][k] ?? L.zh[k] ?? k; return typeof v === 'function' ? v(...a) : v; }
+
+function applyStatic() {
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : 'en';
+  document.querySelectorAll('[data-i]').forEach((e) => { e.textContent = t(e.dataset.i); });
+  document.querySelectorAll('[data-ia]').forEach((e) => e.setAttribute('aria-label', t(e.dataset.ia)));
+  $('langBtn').textContent = lang === 'zh' ? 'EN' : '中';
+  if (ctx) $('soundText').textContent = t('soundDone');
+}
+function setLang(l) {
+  lang = l;
+  try { localStorage.setItem('lang', l); } catch {}
+  applyStatic();
+  if (lastData) render(lastData); else if (fails >= 3) offline(true);
+  renderLog();
+  renderHistory();
+}
+
+const INFO = {
+  normal:  { icon: 'check', y: 46,  stage: 0,  drip: true },
+  low:     { icon: 'alert', y: 108, stage: 1,  drip: true },
+  empty:   { icon: 'bell',  y: 160, stage: 2,  drip: false },
+  fault:   { icon: 'alert', y: 108, stage: -1, drip: false },
+  offline: { icon: 'off',   y: 108, stage: -1, drip: false },
+};
 const LOG_COLOR = { normal: 'var(--ok)', low: 'var(--warn)', empty: 'var(--bad)', fault: 'var(--fault)', offline: 'var(--off)' };
 
-let last = null, ctx = null, fails = 0, muteTotal = 0;
+let last = null, lastData = null, ctx = null, fails = 0, muteTotal = 0, logItems = [], hist = null;
 const demo = { state: 'normal', since: Date.now(), muteUntil: 0 };
 
 function enableSound() {
   ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
   ctx.resume();
   beep(1);
-  $('soundText').textContent = '這頁的提示音已開啟';
+  $('soundText').textContent = t('soundDone');
   $('soundBtn').disabled = true;
 }
 function beep(n, f = 1000) {
   if (!ctx) return;
-  const t = ctx.currentTime;
+  const at = ctx.currentTime;
   for (let i = 0; i < n; i++) {
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.frequency.value = f; g.gain.value = 0.3;
     o.connect(g).connect(ctx.destination);
-    o.start(t + i * 0.3); o.stop(t + i * 0.3 + 0.15);
+    o.start(at + i * 0.3); o.stop(at + i * 0.3 + 0.15);
   }
 }
 function vib(p) { if (navigator.vibrate) navigator.vibrate(p); }
-function clock() { return new Date().toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit' }); }
-function fmt(s) {
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-  if (h) return `已持續 ${h} 小時 ${m} 分`;
-  if (m) return `已持續 ${m} 分 ${s % 60} 秒`;
-  return `已持續 ${s} 秒`;
-}
+function clock(ms) { return new Date(ms || Date.now()).toLocaleTimeString(lang === 'zh' ? 'zh-TW' : 'en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' }); }
+function fmt(s) { return t('since', Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60); }
+function dur(s) { return t('dur', s); }
+function short(s) { return dur(Math.max(0, s)).replace(/^(約 |~)/, ''); }
 
-function addLog(state, text) {
-  const ul = $('log');
-  if (ul.querySelector('.empty-note')) ul.innerHTML = '';
-  const li = document.createElement('li');
-  li.style.setProperty('--c', LOG_COLOR[state]);
-  li.innerHTML = '<time>' + clock() + '</time><span></span>';
-  li.lastChild.textContent = text;
-  ul.prepend(li);
-  while (ul.children.length > 30) ul.lastChild.remove();
+// 事件紀錄存成狀態代碼，切換語言時能重新顯示
+function addLog(state) {
+  logItems.unshift({ state, at: Date.now() });
+  logItems = logItems.slice(0, 30);
+  renderLog();
+}
+function renderLog() {
+  $('log').innerHTML = logItems.length
+    ? logItems.map((x) => `<li style="--c:${LOG_COLOR[x.state]}"><time>${clock(x.at)}</time><span>${x.state === 'offline' ? t('lostConn') : t('st_' + x.state)}</span></li>`).join('')
+    : `<li style="padding-left:0"><p class="empty-note" style="width:100%">${t('noEvents')}</p></li>`;
 }
 
 function setConn(online, rssi, ap) {
   $('conn').classList.toggle('on', online);
-  $('connText').textContent = !online ? '離線' : ap ? '熱點模式' : '即時';
+  $('connText').textContent = !online ? t('offline') : ap ? t('hotspot') : t('live');
   const level = !online || ap ? 0 : rssi > -55 ? 4 : rssi > -67 ? 3 : rssi > -78 ? 2 : 1;
   [...$('bars').children].forEach((b, i) => b.classList.toggle('on', i < level));
   $('bars').hidden = !online || ap;
 }
 
-function setHero(state, title) {
+function setHero(state) {
   const i = INFO[state];
   const hero = $('hero');
   hero.dataset.s = state;
-  $('eyebrow').textContent = i.eyebrow;
+  $('eyebrow').textContent = t('eb_' + state);
   $('stIcon').innerHTML = `<use href="#i-${i.icon}"/>`;
-  $('st').textContent = title;
-  $('hint').textContent = i.hint;
+  $('st').textContent = t('st_' + state);
+  $('hint').textContent = t('h_' + state);
   $('liquid').style.transform = `translateY(${i.y}px)`;
   $('liquid').style.opacity = state === 'offline' ? 0.25 : state === 'fault' ? 0.5 : 1;
   $('bag').classList.toggle('dripping', i.drip);
   $('stages').style.setProperty('--c', getComputedStyle(hero).getPropertyValue('--c'));
   [...$('stages').children].forEach((li, k) => {
     li.classList.toggle('now', k === i.stage);
+    li.dataset.now = t('now');
     li.classList.toggle('done', i.stage >= 0 && k < i.stage);
   });
 }
 
 function sensor(id, liquid) {
   $(id).className = 'sensor ' + (liquid ? 'yes' : 'no');
-  $(id + 'Text').textContent = liquid ? '有液體' : '無液體';
+  $(id + 'Text').textContent = liquid ? t('liquid') : t('noLiquid');
   $(id === 'u' ? 'dotU' : 'dotL').setAttribute('fill', liquid ? 'var(--ok)' : 'var(--bad)');
-}
-
-function dur(s) {
-  if (s < 60) return '不到 1 分鐘';
-  const m = Math.round(s / 60);
-  return m < 60 ? `約 ${m} 分鐘` : `約 ${Math.floor(m / 60)} 小時 ${m % 60} 分`;
 }
 
 // 預估剩餘時間：第一階段 = 到耗盡，第二階段 = 到滴完
@@ -342,22 +405,17 @@ function renderEta(d) {
   const el = $('eta');
   if (d.state !== 'low' && d.state !== 'empty') { el.hidden = true; return; }
   el.hidden = false;
-  if (d.eta < 0) {
-    el.innerHTML = '無法預估剩餘時間<small>在「設定」填入醫囑滴速即可預估</small>';
-    return;
-  }
-  const src = { measured: '依這袋實測滴速', set: '依醫囑滴速', last: '依上一袋實測滴速' }[d.rateSrc] || '';
-  const main = d.eta === 0 ? '應已滴完，請立即處理' : `預計${dur(d.eta)}後${d.state === 'low' ? '耗盡' : '滴完'}`;
-  el.innerHTML = main + `<small>${src}・每小時約 ${d.rate} ml</small>`;
+  if (d.eta < 0) { el.innerHTML = `${t('etaUnknown')}<small>${t('etaHint')}</small>`; return; }
+  const main = d.eta === 0 ? t('etaDone') : t('eta_' + d.state, dur(d.eta));
+  el.innerHTML = `${main}<small>${d.rateSrc ? t('src_' + d.rateSrc) + t('sep') : ''}${t('perHour', d.rate)}</small>`;
 }
 
 // 更換紀錄
-function dateStr(t) {
-  if (!t) return '時間未知';
-  const d = new Date(t * 1000), p = (n) => String(n).padStart(2, '0');
-  return `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())} 更換`;
+function dateStr(sec) {
+  if (!sec) return t('unknownTime');
+  const d = new Date(sec * 1000), p = (n) => String(n).padStart(2, '0');
+  return t('replaced', `${d.getMonth() + 1}/${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}`);
 }
-function short(s) { return dur(Math.max(0, s)).replace('約 ', ''); }
 function demoHistory() {
   const n = Math.floor(Date.now() / 1000);
   return { items: [
@@ -366,22 +424,26 @@ function demoHistory() {
   ] };
 }
 async function loadHistory() {
-  let h;
-  try { h = DEMO ? demoHistory() : await (await fetch('/history', { cache: 'no-store' })).json(); } catch { return; }
-  $('hist').innerHTML = h.items.length ? h.items.slice(0, 10).map((r) => {
+  try { hist = DEMO ? demoHistory() : await (await fetch('/history', { cache: 'no-store' })).json(); } catch { return; }
+  renderHistory();
+}
+function renderHistory() {
+  if (!hist) return;
+  $('hist').innerHTML = hist.items.length ? hist.items.slice(0, 10).map((r) => {
     const alertAt = r.l || r.e, parts = [];
-    if (r.s && r.d > r.s) parts.push('這袋使用' + dur(r.d - r.s).replace('約 ', ' '));
-    if (alertAt && r.a) parts.push('警報後 ' + short(r.a - alertAt) + '確認');
-    if (alertAt && r.d) parts.push('警報後 ' + short(r.d - alertAt) + '完成更換');
-    return `<li><b>${dateStr(r.d)}</b><span>${parts.join('・') || '—'}</span></li>`;
-  }).join('') : '<li class="empty-note">尚無紀錄。點滴偏低、更換完成後會自動記錄在這裡。</li>';
+    if (r.s && r.d > r.s) parts.push(t('used', short(r.d - r.s)));
+    if (alertAt && r.a) parts.push(t('acked', short(r.a - alertAt)));
+    if (alertAt && r.d) parts.push(t('done', short(r.d - alertAt)));
+    return `<li><b>${dateStr(r.d)}</b><span>${parts.join(t('sep')) || '—'}</span></li>`;
+  }).join('') : `<li class="empty-note">${t('noHistory')}</li>`;
 }
 
 function render(d) {
-  $('bed').textContent = d.bed;
-  $('addr').textContent = d.ap ? '熱點模式・192.168.4.1' : d.host ? d.host + '.local' : '點滴監控';
+  lastData = d;
+  $('bed').textContent = DEMO ? t('demoBed') : d.bed;
+  $('addr').textContent = d.ap ? t('hotspotAddr') : d.host ? d.host + '.local' : t('appName');
   setConn(true, d.rssi, d.ap);
-  setHero(d.state, d.text);
+  setHero(d.state);
   $('since').textContent = fmt(d.since);
   renderEta(d);
   sensor('u', d.upper);
@@ -390,24 +452,24 @@ function render(d) {
   // 靜音倒數
   if (d.muted) {
     muteTotal = Math.max(muteTotal, d.muteLeft);
-    $('muteText').textContent = `已靜音・${d.muteLeft} 秒`;
+    $('muteText').textContent = t('muted', d.muteLeft);
     $('meter').style.width = (muteTotal ? (d.muteLeft / muteTotal) * 100 : 0) + '%';
   } else {
     muteTotal = 0;
-    $('muteText').textContent = '靜音現場警報';
+    $('muteText').textContent = t('mute');
     $('meter').style.width = '0';
   }
   $('muteBtn').disabled = d.state === 'normal' || d.muted;
-  $('m').textContent = d.muted ? '靜音中' : d.state === 'normal' ? '待命' : '警報中';
+  $('m').textContent = d.muted ? t('bzMuted') : d.state === 'normal' ? t('bzIdle') : t('bzAlarm');
 
-  $('pushTitle').textContent = d.push ? `已綁定 ${d.push} 支手機` : '手機推播';
-  $('pushInfo').textContent = d.push ? '警報會即時推播，手機鎖定也收得到。' : '尚未綁定手機。設定後，手機鎖定時也能收到警報。';
+  $('pushTitle').textContent = d.push ? t('pushLinked', d.push) : t('push');
+  $('pushInfo').textContent = d.push ? t('pushOnInfo') : t('pushOffInfo');
   $('pushBadge').classList.toggle('ok', !!d.push);
   $('pushTestBtn').hidden = !d.push;
-  document.title = (d.state === 'empty' ? '🔴 ' : d.state === 'low' ? '🟡 ' : '') + '點滴監控';
+  document.title = (d.state === 'empty' ? '🔴 ' : d.state === 'low' ? '🟡 ' : '') + t('appName');
 
   if (d.state !== last) {
-    if (last !== null || d.state !== 'normal') addLog(d.state, d.text);
+    if (last !== null || d.state !== 'normal') addLog(d.state);
     if (d.state === 'normal' && last) loadHistory();  // 剛更換完，更新紀錄
     if (d.state === 'low')   { beep(2, 880);  vib(300); }
     if (d.state === 'empty') { beep(5, 1200); vib([300, 100, 300, 100, 300]); }
@@ -418,11 +480,14 @@ function render(d) {
   }
 }
 
-function offline() {
+// redraw = 只是切換語言，不要重複記錄與警示
+function offline(redraw) {
+  lastData = null;
   setConn(false);
-  setHero('offline', '裝置離線');
-  $('since').textContent = '最後更新 ' + clock();
-  addLog('offline', '與裝置失去連線');
+  setHero('offline');
+  $('since').textContent = t('lastUpdate', clock());
+  if (redraw) return;
+  addLog('offline');
   beep(3, 500); vib(500);
   last = null;
 }
@@ -433,7 +498,7 @@ function demoStatus() {
   // 展示用：醫囑滴速 100 ml/小時，上下位之間 100 ml、下位以下 50 ml
   const eta = s === 'low' ? Math.max(0, 5400 - since) : s === 'empty' ? Math.max(0, 1800 - since) : -1;
   return {
-    bed: '301 病房 A 床', state: s, text: TEXT[s],
+    bed: '', state: s,
     upper: s === 'normal' || s === 'fault', lower: s === 'normal' || s === 'low',
     muted, muteLeft: muted ? Math.ceil((demo.muteUntil - now) / 1000) : 0,
     since, eta, rate: 100, rateSrc: 'set', rssi: -55, ap: false, push: 1, host: 'iv-monitor'
@@ -463,20 +528,24 @@ function mute() {
 async function pushTest() {
   const b = $('pushTestBtn');
   b.disabled = true;
-  b.textContent = '已送出，幾秒內會收到';
+  b.textContent = t('pushSent');
   if (!DEMO) await fetch('/pushtest', { method: 'POST' }).catch(() => {});
-  setTimeout(() => { b.disabled = false; b.textContent = '傳送測試推播'; }, 5000);
+  setTimeout(() => { b.disabled = false; b.textContent = t('pushTest'); }, 5000);
 }
 
+// 不用行內 onclick：行內事件裡的 lang 會被當成按鈕自己的 lang 屬性
+$('langBtn').addEventListener('click', () => setLang(lang === 'zh' ? 'en' : 'zh'));
+applyStatic();
+renderLog();
 loadHistory();
 setInterval(loadHistory, 60000);
 
 if (DEMO) {
   $('gear').hidden = true;
   $('demo').style.display = 'block';
+  const order = ['normal', 'low', 'empty', 'fault'];
   document.querySelectorAll('#demo button').forEach((b) => b.onclick = () => {
     if (b.dataset.s !== demo.state) {
-      const order = Object.keys(TEXT);
       if (order.indexOf(b.dataset.s) > order.indexOf(demo.state)) demo.muteUntil = 0;
       demo.state = b.dataset.s;
       demo.since = Date.now();

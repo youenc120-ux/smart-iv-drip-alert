@@ -30,6 +30,7 @@ body{margin:0;font-family:system-ui,-apple-system,"PingFang TC","Noto Sans TC","
   padding:max(12px,env(safe-area-inset-top)) 16px 12px;display:flex;align-items:center;gap:10px}
 .top h1{font-size:19px;margin:0;font-weight:700;letter-spacing:.3px}
 .top svg{width:24px;height:24px}
+.top .lang{margin-left:auto;font:inherit;font-size:14px;font-weight:700;width:44px;height:44px;border:0;border-radius:50%;background:#ffffff26;color:#fff;cursor:pointer}
 main{max-width:480px;margin:0 auto;padding:16px 16px calc(32px + env(safe-area-inset-bottom))}
 .card{background:var(--card);border-radius:var(--radius);padding:18px;margin-bottom:12px;box-shadow:0 1px 3px #0000000f}
 h2{font-size:17px;margin:0 0 4px}
@@ -102,7 +103,8 @@ input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blu
 
 <header class="top">
   <svg class="i" aria-hidden="true"><use href="#i-drop"/></svg>
-  <h1>點滴警報</h1>
+  <h1 data-i="app">點滴警報</h1>
+  <button class="lang" id="langBtn" type="button" aria-label="切換語言 Switch language">EN</button>
 </header>
 
 <main>
@@ -110,12 +112,12 @@ input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blu
   <section class="card step" id="stepInstall" hidden>
     <span class="badge">1</span>
     <div class="step-body">
-      <h2>加入主畫面</h2>
-      <p class="sub">iPhone 必須從主畫面開啟，才能接收推播（iOS 16.4 以上）。</p>
+      <h2 data-i="installTitle">加入主畫面</h2>
+      <p class="sub" data-i="installDesc">iPhone 必須從主畫面開啟，才能接收推播（iOS 16.4 以上）。</p>
       <ol class="how">
-        <li>點 Safari 下方的 <span class="inline-i"><svg class="i"><use href="#i-share"/></svg></span>「分享」</li>
-        <li>選擇 <span class="inline-i"><svg class="i"><use href="#i-plus"/></svg></span>「加入主畫面」</li>
-        <li>回到主畫面，點「點滴警報」圖示開啟</li>
+        <li data-h="install1"></li>
+        <li data-h="install2"></li>
+        <li data-i="install3"></li>
       </ol>
     </div>
   </section>
@@ -124,12 +126,12 @@ input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blu
   <section class="card step" id="stepPush">
     <span class="badge" id="pushBadge">2</span>
     <div class="step-body">
-      <h2 id="pushTitle">開啟推播通知</h2>
-      <p class="sub" id="pushDesc">點滴偏低或耗盡時，即使手機鎖定也會跳出通知。</p>
+      <h2 id="pushTitle"></h2>
+      <p class="sub" id="pushDesc"></p>
       <button class="btn primary" id="pushBtn" type="button">
-        <svg class="i" aria-hidden="true"><use href="#i-bell"/></svg><span>開啟推播</span>
+        <svg class="i" aria-hidden="true"><use href="#i-bell"/></svg><span data-i="enable">開啟推播</span>
       </button>
-      <button class="btn ghost" id="testBtn" type="button" hidden>傳送本機測試通知</button>
+      <button class="btn ghost" id="testBtn" type="button" data-i="localTest" hidden>傳送本機測試通知</button>
       <p class="err" id="pushErr" role="alert"></p>
     </div>
   </section>
@@ -138,30 +140,30 @@ input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blu
   <section class="card step" id="stepDevices">
     <span class="badge" id="devBadge">3</span>
     <div class="step-body">
-      <h2>連結點滴裝置</h2>
-      <p class="sub">手機與裝置連上同一個 Wi-Fi，輸入裝置位址後按「連結」。</p>
-      <label for="ipInput">裝置位址</label>
+      <h2 data-i="devTitle">連結點滴裝置</h2>
+      <p class="sub" data-i="devDesc">手機與裝置連上同一個 Wi-Fi，輸入裝置位址後按「連結」。</p>
+      <label for="ipInput" data-i="addr">裝置位址</label>
       <div class="field">
         <input id="ipInput" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="iv-monitor.local">
-        <button class="btn primary small" id="pairBtn" type="button">連結</button>
+        <button class="btn primary small" id="pairBtn" type="button" data-i="link">連結</button>
       </div>
-      <p class="help">預設是 iv-monitor.local（可在裝置設定頁修改），也可以輸入 IP，例如 192.168.1.50。連結時會短暫跳到裝置頁面；如果裝置有設配對碼，會請你輸入。完成後點左上角「完成」返回。</p>
+      <p class="help" data-i="addrHelp"></p>
       <p class="err" id="devErr" role="alert"></p>
       <div id="devList"></div>
     </div>
   </section>
 
-  <div class="section-title"><h2>各床最新狀態</h2></div>
+  <div class="section-title"><h2 data-i="latestTitle">各床最新狀態</h2></div>
   <div id="beds" aria-live="polite"></div>
 
   <div class="section-title">
-    <h2>推播紀錄</h2>
-    <button class="btn danger small" id="clearBtn" type="button" hidden>清除</button>
+    <h2 data-i="logTitle">推播紀錄</h2>
+    <button class="btn danger small" id="clearBtn" type="button" data-i="clear" hidden>清除</button>
   </div>
   <section class="card"><ul class="log" id="log"></ul></section>
 
-  <p class="foot">本系統為專題原型，非醫療器材。<br>
-    <a href="https://github.com/youenc120-ux/smart-iv-drip-alert">GitHub 原始碼</a></p>
+  <p class="foot"><span data-i="foot">本系統為專題原型，非醫療器材。</span><br>
+    <a href="https://github.com/youenc120-ux/smart-iv-drip-alert" data-i="source">GitHub 原始碼</a></p>
 </main>
 
 <script src="config.js"></script>
@@ -169,36 +171,88 @@ input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blu
 const $ = (id) => document.getElementById(id);
 const DEMO = new URLSearchParams(location.search).has('demo');
 const ST = {
-  empty:  { label: '第二階段：請立即更換', c: 'var(--bad)',   ci: 'var(--bad-ink)',   sev: 4, icon: 'bell' },
-  low:    { label: '第一階段：液量偏低',   c: 'var(--warn)',  ci: 'var(--warn-ink)',  sev: 3, icon: 'alert' },
-  fault:  { label: '感測器異常',           c: 'var(--fault)', ci: 'var(--fault-ink)', sev: 2, icon: 'alert' },
-  normal: { label: '液量充足',             c: 'var(--ok)',    ci: 'var(--ok-ink)',    sev: 0, icon: 'check' },
-  test:   { label: '已連結',               c: 'var(--blue)',  ci: 'var(--blue)',      sev: -1, icon: 'link' },
+  empty:  { c: 'var(--bad)',   ci: 'var(--bad-ink)',   sev: 4, icon: 'bell' },
+  low:    { c: 'var(--warn)',  ci: 'var(--warn-ink)',  sev: 3, icon: 'alert' },
+  fault:  { c: 'var(--fault)', ci: 'var(--fault-ink)', sev: 2, icon: 'alert' },
+  normal: { c: 'var(--ok)',    ci: 'var(--ok-ink)',    sev: 0, icon: 'check' },
+  test:   { c: 'var(--blue)',  ci: 'var(--blue)',      sev: -1, icon: 'link' },
 };
 
-const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
-const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+// ===== 中英文字 =====
+const L = {
+  zh: {
+    app: '點滴警報', installTitle: '加入主畫面', installDesc: 'iPhone 必須從主畫面開啟，才能接收推播（iOS 16.4 以上）。',
+    install1: (i) => `點 Safari 下方的 ${i}「分享」`, install2: (i) => `選擇 ${i}「加入主畫面」`, install3: '回到主畫面，點「點滴警報」圖示開啟',
+    enable: '開啟推播', localTest: '傳送本機測試通知', pushOnT: '推播已開啟', pushOnD: '這支手機可以接收點滴警報。',
+    pushT: '開啟推播通知', pushD: '點滴偏低或耗盡時，即使手機鎖定也會跳出通知。', pushInstallD: '完成上一步、從主畫面開啟後，才能在這裡開啟推播。',
+    unsupT: '這個瀏覽器不支援推播', unsupD: '請改用 iPhone 的 Safari（iOS 16.4 以上），或 Android 的 Chrome。',
+    deniedT: '通知已被封鎖', deniedIos: '請到 iPhone「設定 → 通知 → 點滴警報」開啟「允許通知」。', deniedOther: '請到瀏覽器的網站設定中允許通知，再重新整理這一頁。',
+    enableErr: (m) => `開啟失敗：${m}。請稍後再試一次。`, testT: '🔔 測試通知', testB: '通知功能正常，裝置警報會像這樣出現。',
+    devTitle: '連結點滴裝置', devDesc: '手機與裝置連上同一個 Wi-Fi，輸入裝置位址後按「連結」。', addr: '裝置位址', link: '連結',
+    addrHelp: '預設是 iv-monitor.local（可在裝置設定頁修改），也可以輸入 IP，例如 192.168.1.50。連結時會短暫跳到裝置頁面；如果裝置有設配對碼，會請你輸入。完成後點左上角「完成」返回。',
+    needPush: '請先完成上一步「開啟推播」。', badAddr: '位址格式不正確，例如 iv-monitor.local 或 192.168.1.50',
+    relinkNeed: '需要重新連結', linked: '已連結', waiting: '等待測試通知', live: '即時監控', relink: '重新連結', remove: '移除',
+    confirmRemove: (ip) => `確定要移除 ${ip}？這支手機將不再收到它的警報。`,
+    latestTitle: '各床最新狀態', noAlerts: '尚未收到任何警報。<br>裝置偵測到液量變化時，會顯示在這裡。',
+    logTitle: '推播紀錄', clear: '清除', confirmClear: '確定要清除所有推播紀錄？', noLog: '還沒有推播紀錄',
+    foot: '本系統為專題原型，非醫療器材。', source: 'GitHub 原始碼',
+    st_empty: '第二階段：請立即更換', st_low: '第一階段：液量偏低', st_fault: '感測器異常', st_normal: '液量充足', st_test: '已連結',
+    now: '剛剛', minAgo: (n) => `${n} 分鐘前`, hrAgo: (n) => `${n} 小時前`, dayAgo: (n) => `${n} 天前`, sep: '・',
+  },
+  en: {
+    app: 'IV Alerts', installTitle: 'Add to Home Screen', installDesc: 'On iPhone, open the app from the Home Screen to receive alerts (iOS 16.4+).',
+    install1: (i) => `Tap ${i} Share at the bottom of Safari`, install2: (i) => `Choose ${i} Add to Home Screen`, install3: 'Open "IV Alerts" from the Home Screen',
+    enable: 'Turn on alerts', localTest: 'Send a test notification', pushOnT: 'Alerts are on', pushOnD: 'This phone can receive IV alerts.',
+    pushT: 'Turn on push alerts', pushD: 'Get notified when an IV bag runs low or empty, even with the phone locked.', pushInstallD: 'Finish the previous step and open the app from the Home Screen first.',
+    unsupT: "This browser can't receive push alerts", unsupD: 'Use Safari on iPhone (iOS 16.4+) or Chrome on Android.',
+    deniedT: 'Notifications are blocked', deniedIos: 'Go to iPhone Settings → Notifications → IV Alerts and turn on Allow Notifications.', deniedOther: 'Allow notifications in the site settings, then reload this page.',
+    enableErr: (m) => `Couldn't turn on alerts: ${m}. Please try again.`, testT: '🔔 Test notification', testB: 'Notifications work. Device alerts will look like this.',
+    devTitle: 'Link an IV device', devDesc: 'Put the phone and the device on the same Wi-Fi, enter the device address and tap Link.', addr: 'Device address', link: 'Link',
+    addrHelp: 'The default is iv-monitor.local (change it in device settings), or enter an IP such as 192.168.1.50. You will briefly jump to the device page; enter the pairing code if asked, then tap Done to come back.',
+    needPush: 'Turn on alerts in the previous step first.', badAddr: 'Invalid address, e.g. iv-monitor.local or 192.168.1.50',
+    relinkNeed: 'Needs relinking', linked: 'Linked', waiting: 'Waiting for test alert', live: 'Live view', relink: 'Relink', remove: 'Remove',
+    confirmRemove: (ip) => `Remove ${ip}? This phone will stop receiving its alerts.`,
+    latestTitle: 'Latest status by bed', noAlerts: 'No alerts yet.<br>Level changes reported by the device will appear here.',
+    logTitle: 'Alert history', clear: 'Clear', confirmClear: 'Clear all alert history?', noLog: 'No alerts yet',
+    foot: 'Student prototype, not a medical device.', source: 'Source on GitHub',
+    st_empty: 'Stage 2: Replace now', st_low: 'Stage 1: Level low', st_fault: 'Sensor fault', st_normal: 'Level OK', st_test: 'Linked',
+    now: 'just now', minAgo: (n) => `${n} min ago`, hrAgo: (n) => `${n} h ago`, dayAgo: (n) => `${n} d ago`, sep: ' · ',
+  },
+};
+// 裝置推播內容是中文；英文模式依狀態改用英文說明
+const BODY_EN = {
+  low: 'Stage 1: level low. Prepare a replacement bag.', empty: 'Stage 2: the IV bag is almost empty. Replace it now!',
+  fault: 'Sensor reading is abnormal. Check the sensor placement.', normal: 'Level back to normal (replaced or resolved).',
+  test: 'Test alert: notifications from this device are working.',
+};
 
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
+let lang = store.get('lang', null) || (/^zh/i.test(navigator.language) ? 'zh' : 'en');
+function t(k, ...a) { const v = L[lang][k] ?? L.zh[k] ?? k; return typeof v === 'function' ? v(...a) : v; }
+function bodyText(a) { return lang === 'en' ? BODY_EN[a.state] || a.body : a.body; }
+
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 
 let devices = store.get('devices', []);   // [{ ip, ep }]：ep = 連結時使用的推播訂閱
 let alerts = [];
 let currentEndpoint = null;
 
 function icon(name) { return `<svg class="i" aria-hidden="true"><use href="#i-${name}"/></svg>`; }
+function inlineIcon(name) { return `<span class="inline-i">${icon(name)}</span>`; }
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function two(n) { return String(n).padStart(2, '0'); }
 function clock(ms) { const d = new Date(ms); return `${two(d.getHours())}:${two(d.getMinutes())}`; }
 function ago(ms) {
   const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
-  if (s < 60) return '剛剛';
-  if (s < 3600) return `${Math.floor(s / 60)} 分鐘前`;
-  if (s < 86400) return `${Math.floor(s / 3600)} 小時前`;
-  return `${Math.floor(s / 86400)} 天前`;
+  if (s < 60) return t('now');
+  if (s < 3600) return t('minAgo', Math.floor(s / 60));
+  if (s < 86400) return t('hrAgo', Math.floor(s / 3600));
+  return t('dayAgo', Math.floor(s / 86400));
 }
 function b64ToBytes(s) {
   s = s.replace(/-/g, '+').replace(/_/g, '/');
@@ -206,6 +260,27 @@ function b64ToBytes(s) {
   return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 }
 function alertTime(a) { return (a.t ? a.t * 1000 : 0) || a.received || Date.now(); }
+
+// ===== 語言 =====
+function applyStatic() {
+  document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : 'en';
+  document.title = t('app');
+  document.querySelectorAll('[data-i]').forEach((e) => { e.textContent = t(e.dataset.i); });
+  $('stepInstall').querySelector('[data-h="install1"]').innerHTML = t('install1', inlineIcon('share'));
+  $('stepInstall').querySelector('[data-h="install2"]').innerHTML = t('install2', inlineIcon('plus'));
+  $('langBtn').textContent = lang === 'zh' ? 'EN' : '中';
+}
+// Service Worker 讀不到 localStorage，另存一份讓通知也用對的語言
+async function shareLang() {
+  try { await (await caches.open('iv-alerts')).put('lang.json', new Response(JSON.stringify(lang))); } catch {}
+}
+$('langBtn').addEventListener('click', () => {
+  lang = lang === 'zh' ? 'en' : 'zh';
+  store.set('lang', lang);
+  shareLang();
+  applyStatic();
+  render();
+});
 
 // ===== 推播 =====
 async function getSub() {
@@ -227,7 +302,7 @@ async function enablePush() {
       }
     }
   } catch (e) {
-    $('pushErr').textContent = '開啟失敗：' + e.message + '。請稍後再試一次。';
+    $('pushErr').textContent = t('enableErr', e.message);
   }
   $('pushBtn').disabled = false;
   render();
@@ -235,7 +310,7 @@ async function enablePush() {
 
 async function testNotification() {
   const reg = await navigator.serviceWorker.ready;
-  reg.showNotification('🔔 測試通知', { body: '通知功能正常，裝置警報會像這樣出現。', icon: 'icon-192.png', tag: 'iv-test' });
+  reg.showNotification(t('testT'), { body: t('testB'), icon: 'icon-192.png', tag: 'iv-test' });
 }
 
 // ===== 裝置連結 =====
@@ -248,11 +323,11 @@ async function pair(ip, unsub) {
   const sub = await getSub();
   if (!sub) {
     if (unsub) { devices = devices.filter((d) => d.ip !== ip); store.set('devices', devices); return render(); }
-    $('devErr').textContent = '請先完成上一步「開啟推播」。';
+    $('devErr').textContent = t('needPush');
     return;
   }
   const j = sub.toJSON();
-  const h = new URLSearchParams({ e: j.endpoint, k: j.keys.p256dh, a: j.keys.auth, r: location.origin + location.pathname });
+  const h = new URLSearchParams({ e: j.endpoint, k: j.keys.p256dh, a: j.keys.auth, r: location.origin + location.pathname, l: lang });
   if (unsub) {
     h.set('do', 'unsub');
     devices = devices.filter((d) => d.ip !== ip);
@@ -267,7 +342,7 @@ async function pair(ip, unsub) {
 function onPairClick() {
   const ip = normalizeIp($('ipInput').value);
   if (!/^[a-z0-9.-]+(:\d+)?$/i.test(ip)) {
-    $('devErr').textContent = '位址格式不正確，例如 iv-monitor.local 或 192.168.1.50';
+    $('devErr').textContent = t('badAddr');
     $('ipInput').focus();
     return;
   }
@@ -285,7 +360,7 @@ async function loadAlerts() {
 }
 
 async function clearAlerts() {
-  if (!confirm('確定要清除所有推播紀錄？')) return;
+  if (!confirm(t('confirmClear'))) return;
   try { await (await caches.open('iv-alerts')).delete('alerts.json'); } catch {}
   alerts = [];
   render();
@@ -315,27 +390,14 @@ async function render() {
   $('pushBadge').classList.toggle('done', on);
   $('pushBtn').hidden = on;
   $('testBtn').hidden = !on;
-  if (needInstall) {
-    $('pushTitle').textContent = '開啟推播通知';
-    $('pushDesc').textContent = '完成上一步、從主畫面開啟後，才能在這裡開啟推播。';
-    $('pushBtn').disabled = true;
-  } else if (!pushSupported) {
-    $('pushTitle').textContent = '這個瀏覽器不支援推播';
-    $('pushDesc').textContent = '請改用 iPhone 的 Safari（iOS 16.4 以上），或 Android 的 Chrome。';
-    $('pushBtn').disabled = true;
-  } else if (perm === 'denied') {
-    $('pushTitle').textContent = '通知已被封鎖';
-    $('pushDesc').textContent = isIOS ? '請到 iPhone「設定 → 通知 → 點滴警報」開啟「允許通知」。'
-                                      : '請到瀏覽器的網站設定中允許通知，再重新整理這一頁。';
-    $('pushBtn').disabled = true;
-  } else if (on) {
-    $('pushTitle').textContent = '推播已開啟';
-    $('pushDesc').textContent = '這支手機可以接收點滴警報。';
-  } else {
-    $('pushTitle').textContent = '開啟推播通知';
-    $('pushDesc').textContent = '點滴偏低或耗盡時，即使手機鎖定也會跳出通知。';
-    $('pushBtn').disabled = false;
-  }
+  let title = t('pushT'), desc = t('pushD');
+  if (needInstall) { desc = t('pushInstallD'); $('pushBtn').disabled = true; }
+  else if (!pushSupported) { title = t('unsupT'); desc = t('unsupD'); $('pushBtn').disabled = true; }
+  else if (perm === 'denied') { title = t('deniedT'); desc = isIOS ? t('deniedIos') : t('deniedOther'); $('pushBtn').disabled = true; }
+  else if (on) { title = t('pushOnT'); desc = t('pushOnD'); }
+  else $('pushBtn').disabled = false;
+  $('pushTitle').textContent = title;
+  $('pushDesc').textContent = desc;
 
   // 步驟 3
   const stepNo = needInstall ? 3 : 2;
@@ -347,13 +409,13 @@ async function render() {
   $('devList').innerHTML = list.map((d) => {
     const stale = !DEMO && currentEndpoint && d.ep !== currentEndpoint;
     const ok = confirmed.has(d.ip) && !stale;
-    const status = stale ? `<span class="pill warn-ink">${icon('alert')}需要重新連結</span>`
-                 : ok ? `<span class="pill ok-ink">${icon('check')}已連結</span>`
-                      : `<span class="pill warn-ink">${icon('clock')}等待測試通知</span>`;
+    const status = stale ? `<span class="pill warn-ink">${icon('alert')}${t('relinkNeed')}</span>`
+                 : ok ? `<span class="pill ok-ink">${icon('check')}${t('linked')}</span>`
+                      : `<span class="pill warn-ink">${icon('clock')}${t('waiting')}</span>`;
     return `<div class="dev">
       <div class="name"><b>${esc(d.ip)}</b>${status}</div>
-      <a class="btn ghost small" href="http://${esc(d.ip)}/" target="_blank" rel="noopener">即時監控</a>
-      <button class="btn ${stale ? 'primary' : 'danger'} small" type="button" data-ip="${esc(d.ip)}" data-act="${stale ? 'relink' : 'unlink'}">${stale ? '重新連結' : '移除'}</button>
+      <a class="btn ghost small" href="http://${esc(d.ip)}/" target="_blank" rel="noopener">${t('live')}</a>
+      <button class="btn ${stale ? 'primary' : 'danger'} small" type="button" data-ip="${esc(d.ip)}" data-act="${stale ? 'relink' : 'unlink'}">${stale ? t('relink') : t('remove')}</button>
     </div>`;
   }).join('');
 
@@ -371,18 +433,18 @@ async function render() {
     const href = a.url && /^http:\/\/[^/]+\/$/.test(a.url) ? ` href="${esc(a.url)}" target="_blank" rel="noopener"` : '';
     return `<${tag} class="bed ${a.state}" style="--c:${s.c};--ci:${s.ci}"${href}>
       ${icon(s.icon)}
-      <div><b>${esc(a.bed)}</b><div class="state">${s.label}</div>
-      <p class="sub">${esc(a.body)}</p><p class="sub">${clock(alertTime(a))}・${ago(alertTime(a))}</p></div>
+      <div><b>${esc(a.bed)}</b><div class="state">${t('st_' + a.state)}</div>
+      <p class="sub">${esc(bodyText(a))}</p><p class="sub">${clock(alertTime(a))}${t('sep')}${ago(alertTime(a))}</p></div>
     </${tag}>`;
-  }).join('') : `<section class="card"><p class="empty-note">尚未收到任何警報。<br>裝置偵測到液量變化時，會顯示在這裡。</p></section>`;
+  }).join('') : `<section class="card"><p class="empty-note">${t('noAlerts')}</p></section>`;
 
   // 推播紀錄
   $('clearBtn').hidden = DEMO || !alerts.length;
   $('log').innerHTML = alerts.length ? alerts.slice(0, 30).map((a) => {
     const s = ST[a.state] || ST.test;
     return `<li style="--c:${s.c}"><time>${clock(alertTime(a))}</time>${icon(s.icon)}
-      <div><b>${esc(a.bed)}</b><p class="sub">${esc(a.body)}</p></div></li>`;
-  }).join('') : '<li><p class="empty-note">還沒有推播紀錄</p></li>';
+      <div><b>${esc(a.bed)}</b><p class="sub">${esc(bodyText(a))}</p></div></li>`;
+  }).join('') : `<li><p class="empty-note">${t('noLog')}</p></li>`;
 }
 
 // ===== 啟動 =====
@@ -407,9 +469,11 @@ $('devList').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-ip]');
   if (!b) return;
   if (b.dataset.act === 'relink') return pair(b.dataset.ip, false);
-  if (confirm(`確定要移除 ${b.dataset.ip}？這支手機將不再收到它的警報。`)) pair(b.dataset.ip, true);
+  if (confirm(t('confirmRemove', b.dataset.ip))) pair(b.dataset.ip, true);
 });
 
+applyStatic();
+shareLang();
 const refresh = () => loadAlerts().then(render);
 if (pushSupported) {
   navigator.serviceWorker.register('sw.js').then(refresh, refresh);
