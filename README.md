@@ -57,6 +57,15 @@
 5. 校正：序列埠每秒顯示感測器電位，對照「有液 / 無液」調整 TCRT5000 上的可調電阻，
    並設定程式中的 `LIQUID_LEVEL`
 
+### 無線更新（OTA，不用接 USB）
+
+第一次用 USB 燒錄後，之後都可以透過 Wi-Fi 更新（電腦和裝置要在同一個 Wi-Fi）。密碼是 `secrets.h` 的 `OTA_PASS`。
+
+- **一鍵更新**：`powershell -ExecutionPolicy Bypass -File ota.ps1 -Device iv-monitor.local`（或填 IP），會自動編譯並上傳
+- **用瀏覽器**：Arduino IDE「草稿碼 → 匯出已編譯的二進位檔」，再開 `http://iv-monitor.local/update`（帳號 `admin`）上傳 `.bin`
+- **Arduino IDE 網路連接埠**：也支援，但需要防火牆允許，學校或公司網路常被擋
+
+更新時燈條會以藍色顯示進度；萬一中途斷電，裝置會繼續執行原本的程式，不會變磚。
 ### 手機推播設定（網頁推播）
 
 1. 第一次使用先執行 `make_vapid.ps1` 產生推播金鑰（私鑰寫入 `secrets.h`，公鑰寫入 `docs/config.js`），再燒錄
@@ -86,6 +95,8 @@
 | `webpush.h` | 網頁推播：加密（RFC 8291）與 VAPID 簽章（RFC 8292） |
 | `pair_html.h` | 手機綁定推播用的配對頁 |
 | `make_vapid.ps1` | 產生推播金鑰 |
+| `ota.ps1` | 透過 Wi-Fi 編譯並更新裝置 |
+| `settings_html.h` | 裝置設定頁 |
 | `make_html.ps1` | 修改 `phone.html` 後執行，更新 `index_html.h` 與 `docs/device.html` |
 | `secrets.example.h` | 個人設定範本 |
 | `docs/` | GitHub Pages：推播 App（`index.html`、`sw.js`）與裝置頁展示 |

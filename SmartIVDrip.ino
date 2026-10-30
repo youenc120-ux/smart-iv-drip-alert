@@ -10,6 +10,9 @@
  *   - 手機網頁即時監控（每秒更新）、遠端靜音、預估剩餘時間、更換紀錄
  *   - 網頁設定頁：床位名稱、Wi-Fi、網址、配對碼、點滴參數（免重新燒錄）
  *   - 固定網址：http://<裝置名稱>.local（mDNS）
+ *   - 無線更新（OTA），密碼在 secrets.h 的 OTA_PASS：
+ *       1. 網頁更新：瀏覽器開 http://<裝置>.local/update（帳號 admin），上傳編譯好的 .bin
+ *       2. Arduino IDE「連接埠」選網路裝置（需允許防火牆，學校網路可能被擋）
  *   - 網頁推播：ESP32 直接加密並送到 Apple / Google 推播服務，不經第三方通知平台
  *
  * 接線：
@@ -27,6 +30,8 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ESPmDNS.h>
+#include <ArduinoOTA.h>
+#include <HTTPUpdateServer.h>
 #include <Adafruit_NeoPixel.h>
 #include <Preferences.h>
 #include <time.h>
@@ -80,11 +85,13 @@ const char* STATE_TEXT[]  = { "液量充足", "第一階段：液量偏低", "�
 const char* STATE_EMOJI[] = { "✅", "⚠️", "🚨", "❗" };
 
 WebServer server(80);
+HTTPUpdateServer httpUpdater;
 
 DripState state = NORMAL;
 unsigned long stateSince = 0;
 unsigned long mutedUntil = 0;
 bool apMode = false;
+bool otaRunning = false;      // 無線更新中：暫停警報輸出
 unsigned long restartAt = 0;  // 設定變更後延遲重新開機
 
 // 型別需在第一個函式前定義，Arduino 自動產生的函式宣告才找得到
@@ -718,6 +725,32 @@ void announce(DripState next, DripState prev, unsigned long now) {
   queueNotice(next, msg.c_str());
 }
 
+// ===== 無線更新（OTA）=====
+// 更新期間停止蜂鳴器，燈條以藍色顯示進度；完成後自動重新開機
+void setupOTA() {
+  ArduinoOTA.setHostname(cfg.host.c_str());
+  ArduinoOTA.setPassword(OTA_PASS);
+  ArduinoOTA.setMdnsEnabled(false);  // mDNS 已在 setupWiFi 啟動
+  ArduinoOTA.onStart([]() {
+    otaRunning = true;
+    setBuzzer(0);
+    pixels.clear();
+    pixels.show();
+    Serial.println("[更新] 開始無線更新");
+  });
+  ArduinoOTA.onProgress([](unsigned int done, unsigned int total) {
+    int lit = total ? (int)((uint64_t)done * NUM_PIXELS / total) : 0;
+    for (int i = 0; i < NUM_PIXELS; i++) pixels.setPixelColor(i, i < lit ? pixels.Color(0, 80, 255) : 0);
+    pixels.show();
+  });
+  ArduinoOTA.onEnd([]() { Serial.println("[更新] 完成，重新開機"); });
+  ArduinoOTA.onError([](ota_error_t e) {
+    otaRunning = false;
+    Serial.printf("[更新] 失敗（錯誤 %u），繼續執行原程式\n", e);
+  });
+  ArduinoOTA.begin();
+}
+
 void setupWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(cfg.host.c_str());
@@ -730,7 +763,11 @@ void setupWiFi() {
   }
   if (WiFi.status() == WL_CONNECTED) {
     configTime(0, 0, "pool.ntp.org", "time.google.com");  // 推播簽章與紀錄需要正確時間
-    if (MDNS.begin(cfg.host.c_str())) MDNS.addService("http", "tcp", 80);
+    if (MDNS.begin(cfg.host.c_str())) {
+      MDNS.addService("http", "tcp", 80);
+      MDNS.enableArduino(3232, true);  // 讓 Arduino IDE 找到這台裝置做無線更新
+    }
+    setupOTA();
     Serial.printf("\n已連線，手機開啟 http://%s.local 或 http://%s\n", cfg.host.c_str(),
                   WiFi.localIP().toString().c_str());
   } else {
@@ -797,11 +834,14 @@ void setup() {
   server.on("/config", HTTP_GET, handleConfigGet);
   server.on("/config", HTTP_POST, handleConfigPost);
   server.on("/scan", handleScan);
+  httpUpdater.setup(&server, "/update", "admin", OTA_PASS);  // 網頁無線更新
   server.begin();
 }
 
 void loop() {
   unsigned long now = millis();
+  if (!apMode) ArduinoOTA.handle();
+  if (otaRunning) return;  // 更新中只處理 OTA，避免寫入快閃記憶體時被打斷
   server.handleClient();
 
   updateDebounce(upper, now);

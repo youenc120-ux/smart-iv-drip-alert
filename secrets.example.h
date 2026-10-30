@@ -10,6 +10,9 @@ const char* AP_PASS   = "change-me-123";   // 熱點模式密碼，至少 8 碼
 const char* TG_TOKEN   = "";
 const char* TG_CHAT_ID = "";
 
+// 無線更新（OTA）密碼：從 Arduino IDE 透過 Wi-Fi 燒錄時要輸入，請改成自己的
+const char* OTA_PASS = "change-me-ota";
+
 // 網頁推播金鑰：執行 make_vapid.ps1 會自動產生並寫在下面
 const char* VAPID_PUBLIC  = "";
 const char* VAPID_PRIVATE = "";
