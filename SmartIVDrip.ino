@@ -59,7 +59,9 @@ const int PIN_SENSOR_LOWER = 33;
 const int PIN_BUZZER       = 25;
 const int PIN_PIXELS       = 26;
 
-// 蜂鳴器模組多為「低電位觸發」（I/O 接 GND 才響）。開機後一直響或完全不響，就把這裡改成 HIGH
+// 蜂鳴器：HW-508 是被動式，要送 2–4kHz 方波才會發出清楚的聲音
+// 換成主動式模組（通電就響）時改成 false，並依模組設定 BUZZER_ON（低電位觸發 = LOW）
+const bool BUZZER_PASSIVE = true;
 const int BUZZER_ON = LOW;
 
 // WS2812B 燈條：第 0 顆顯示 Wi-Fi，其餘當液量燈條
@@ -188,27 +190,53 @@ void updatePixels(unsigned long now, bool muted) {
   pixels.show();
 }
 
+// 設定蜂鳴器頻率，0 = 安靜。只有改變時才動作
+void setBuzzer(uint32_t freq) {
+  static uint32_t current = UINT32_MAX;
+  static bool attached = false;
+  if (freq == current) return;
+  current = freq;
+
+  if (!BUZZER_PASSIVE) {
+    digitalWrite(PIN_BUZZER, freq ? BUZZER_ON : !BUZZER_ON);
+    return;
+  }
+  if (freq) {
+    if (!attached) attached = ledcAttach(PIN_BUZZER, freq, 8);
+    if (attached) ledcWriteTone(PIN_BUZZER, freq);  // 50% 方波
+  } else {
+    if (attached) { ledcDetach(PIN_BUZZER); attached = false; }
+    pinMode(PIN_BUZZER, OUTPUT);
+    digitalWrite(PIN_BUZZER, LOW);  // 安靜時保持低電位，蜂鳴器不通電
+  }
+}
+
 void updateOutputs(unsigned long now) {
   bool muted = now < mutedUntil;
   unsigned long t = now - stateSince;
-  bool buzz = false;
+  uint32_t freq = 0;
 
   updatePixels(now, muted);
 
   switch (state) {
-    case LOW_LEVEL:
-      // 進入時響「一聲」(0.5 秒)，之後每 30 秒短響提醒一次
-      buzz = (t < 500) || (t % 30000) < 150;
+    case LOW_LEVEL: {
+      // 「嗶、嗶」兩聲：進入時一次，之後每 30 秒提醒一次
+      unsigned long c = t % 30000;
+      if (c < 150 || (c >= 250 && c < 400)) freq = 2400;
       break;
-    case EMPTY:
-      buzz = (t % 1000) < 300;         // 每秒一聲，連續警報
+    }
+    case EMPTY: {
+      // 每秒前 0.6 秒高低音交替（像救護車），連續警報
+      unsigned long c = t % 1000;
+      if (c < 600) freq = (c / 150) % 2 ? 2000 : 2700;
       break;
+    }
     case SENSOR_FAULT:
-      buzz = (t % 3000) < 80;          // 輕短提示
+      if (t % 3000 < 120) freq = 1500;  // 低沉短音，和液位警報區分
       break;
     default: break;
   }
-  digitalWrite(PIN_BUZZER, (buzz && !muted) ? BUZZER_ON : !BUZZER_ON);
+  setBuzzer(muted ? 0 : freq);
 }
 
 String jsonEscape(const char* s) {
@@ -720,8 +748,8 @@ void setup() {
   Serial.begin(115200);
   pinMode(PIN_SENSOR_UPPER, INPUT);
   pinMode(PIN_SENSOR_LOWER, INPUT);
-  digitalWrite(PIN_BUZZER, !BUZZER_ON);  // 先設成不響，避免開機瞬間亂叫
   pinMode(PIN_BUZZER, OUTPUT);
+  setBuzzer(0);  // 先設成不響，避免開機瞬間亂叫
   pixels.begin();
   pixels.setBrightness(LED_BRIGHTNESS);
 
@@ -731,7 +759,7 @@ void setup() {
     pixels.show();
     delay(50);
   }
-  digitalWrite(PIN_BUZZER, BUZZER_ON); delay(150); digitalWrite(PIN_BUZZER, !BUZZER_ON);
+  setBuzzer(2700); delay(150); setBuzzer(0);
   delay(300);
   pixels.clear();
   pixels.show();
