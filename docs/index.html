@@ -232,6 +232,8 @@ const store = {
 };
 let lang = store.get('lang', null) || (/^zh/i.test(navigator.language) ? 'zh' : 'en');
 function t(k, ...a) { const v = L[lang][k] ?? L.zh[k] ?? k; return typeof v === 'function' ? v(...a) : v; }
+// 床位名稱是使用者輸入的；英文模式把「301 病房 A 床」這種格式轉成「Room 301 Bed A」
+function bedLabel(b) { const m = lang === 'en' && /^\s*(\S+?)\s*病房\s*(\S+?)\s*床\s*$/.exec(b || ''); return m ? `Room ${m[1]} Bed ${m[2]}` : b; }
 function bodyText(a) { return lang === 'en' ? BODY_EN[a.state] || a.body : a.body; }
 
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -269,6 +271,7 @@ function applyStatic() {
   $('stepInstall').querySelector('[data-h="install1"]').innerHTML = t('install1', inlineIcon('share'));
   $('stepInstall').querySelector('[data-h="install2"]').innerHTML = t('install2', inlineIcon('plus'));
   $('langBtn').textContent = lang === 'zh' ? 'EN' : '中';
+  $('langBtn').setAttribute('aria-label', lang === 'zh' ? '切換成英文' : 'Switch to Chinese');
 }
 // Service Worker 讀不到 localStorage，另存一份讓通知也用對的語言
 async function shareLang() {
@@ -433,7 +436,7 @@ async function render() {
     const href = a.url && /^http:\/\/[^/]+\/$/.test(a.url) ? ` href="${esc(a.url)}" target="_blank" rel="noopener"` : '';
     return `<${tag} class="bed ${a.state}" style="--c:${s.c};--ci:${s.ci}"${href}>
       ${icon(s.icon)}
-      <div><b>${esc(a.bed)}</b><div class="state">${t('st_' + a.state)}</div>
+      <div><b>${esc(bedLabel(a.bed))}</b><div class="state">${t('st_' + a.state)}</div>
       <p class="sub">${esc(bodyText(a))}</p><p class="sub">${clock(alertTime(a))}${t('sep')}${ago(alertTime(a))}</p></div>
     </${tag}>`;
   }).join('') : `<section class="card"><p class="empty-note">${t('noAlerts')}</p></section>`;
@@ -443,7 +446,7 @@ async function render() {
   $('log').innerHTML = alerts.length ? alerts.slice(0, 30).map((a) => {
     const s = ST[a.state] || ST.test;
     return `<li style="--c:${s.c}"><time>${clock(alertTime(a))}</time>${icon(s.icon)}
-      <div><b>${esc(a.bed)}</b><p class="sub">${esc(bodyText(a))}</p></div></li>`;
+      <div><b>${esc(bedLabel(a.bed))}</b><p class="sub">${esc(bodyText(a))}</p></div></li>`;
   }).join('') : `<li><p class="empty-note">${t('noLog')}</p></li>`;
 }
 

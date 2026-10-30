@@ -301,12 +301,15 @@ const L = {
 };
 let lang = (() => { try { return localStorage.getItem('lang'); } catch { return null; } })() || (/^zh/i.test(navigator.language) ? 'zh' : 'en');
 function t(k, ...a) { const v = L[lang][k] ?? L.zh[k] ?? k; return typeof v === 'function' ? v(...a) : v; }
+// 床位名稱是使用者輸入的；英文模式把「301 病房 A 床」這種格式轉成「Room 301 Bed A」
+function bedLabel(b) { const m = lang === 'en' && /^\s*(\S+?)\s*病房\s*(\S+?)\s*床\s*$/.exec(b || ''); return m ? `Room ${m[1]} Bed ${m[2]}` : b; }
 
 function applyStatic() {
   document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : 'en';
   document.querySelectorAll('[data-i]').forEach((e) => { e.textContent = t(e.dataset.i); });
   document.querySelectorAll('[data-ia]').forEach((e) => e.setAttribute('aria-label', t(e.dataset.ia)));
   $('langBtn').textContent = lang === 'zh' ? 'EN' : '中';
+  $('langBtn').setAttribute('aria-label', lang === 'zh' ? '切換成英文' : 'Switch to Chinese');
   if (ctx) $('soundText').textContent = t('soundDone');
 }
 function setLang(l) {
@@ -438,7 +441,7 @@ function renderHistory() {
 
 function render(d) {
   lastData = d;
-  $('bed').textContent = DEMO ? t('demoBed') : d.bed;
+  $('bed').textContent = DEMO ? t('demoBed') : bedLabel(d.bed);
   $('addr').textContent = d.ap ? t('hotspotAddr') : d.host ? d.host + '.local' : t('appName');
   setConn(true, d.rssi, d.ap);
   setHero(d.state);

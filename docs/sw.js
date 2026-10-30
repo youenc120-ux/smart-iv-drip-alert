@@ -41,7 +41,9 @@ self.addEventListener('push', (e) => {
 
   // iOS 規定每則推播都必須顯示通知，否則會取消訂閱
   const show = readLang().then((lang) => {
-    const bed = d.bed || (lang === 'en' ? 'IV Monitor' : '點滴監控');
+    // 英文模式把「301 病房 A 床」轉成「Room 301 Bed A」
+    const m = lang === 'en' && /^\s*(\S+?)\s*病房\s*(\S+?)\s*床\s*$/.exec(d.bed || '');
+    const bed = m ? `Room ${m[1]} Bed ${m[2]}` : d.bed || (lang === 'en' ? 'IV Monitor' : '點滴監控');
     const body = lang === 'en' ? BODY_EN[d.state] || d.body || '' : d.body || '';
     return self.registration.showNotification((PREFIX[d.state] || '') + bed, {
       body,

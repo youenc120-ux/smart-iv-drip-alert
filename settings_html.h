@@ -173,6 +173,7 @@ function applyLang() {
   document.querySelectorAll('[data-i]').forEach((e) => { e.textContent = t(e.dataset.i); });
   document.querySelectorAll('[data-ph]').forEach((e) => { e.placeholder = t(e.dataset.ph); });
   $('langBtn').textContent = lang === 'zh' ? 'EN' : '中';
+  $('langBtn').setAttribute('aria-label', lang === 'zh' ? '切換成英文' : 'Switch to Chinese');
   $('rateHelp').textContent = t('rateHelp', cfg.lastRate);
   if (cfg.ap) $('hostHelp').textContent = t('hostAp');
   if (scanned) $('scanBtn').textContent = t('rescan');

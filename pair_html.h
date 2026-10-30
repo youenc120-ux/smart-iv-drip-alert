@@ -59,6 +59,8 @@ let lang = p.get('l') || (() => { try { return localStorage.getItem('lang'); } c
 if (!L[lang]) lang = 'zh';
 const t = (k, ...a) => { const v = L[lang][k]; return typeof v === 'function' ? v(...a) : v; };
 const tErr = (e) => (lang === 'en' ? ERR_EN[e] || e : e);
+// 床位名稱是使用者輸入的；英文模式把「301 病房 A 床」這種格式轉成「Room 301 Bed A」
+function bedLabel(b) { const m = lang === 'en' && /^\s*(\S+?)\s*病房\s*(\S+?)\s*床\s*$/.exec(b || ''); return m ? `Room ${m[1]} Bed ${m[2]}` : b; }
 document.documentElement.lang = lang === 'zh' ? 'zh-Hant' : 'en';
 document.title = t('link');
 document.getElementById('t').textContent = t('linking');
@@ -99,8 +101,8 @@ async function go(pin) {
     }
     document.getElementById('pinForm').hidden = true;
     if (!d.ok) return show(false, t('fail'), d.error ? tErr(d.error) : t('retry'));
-    if (unsub) show(true, t('unlinked'), t('unlinkedD', d.bed));
-    else show(true, t('linked'), t('linkedD', d.bed));
+    if (unsub) show(true, t('unlinked'), t('unlinkedD', bedLabel(d.bed)));
+    else show(true, t('linked'), t('linkedD', bedLabel(d.bed)));
   } catch (e) {
     show(false, t('noConn'), t('noConnD'));
   }
