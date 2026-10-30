@@ -29,26 +29,28 @@
 |---|---|
 | ESP32-WROOM-32 開發板（DevKit） | 1 |
 | TCRT5000 紅外線反射感測模組 | 2 |
-| 5V 主動式蜂鳴器 + 2N2222 電晶體 + 1kΩ 電阻 | 1 組 |
-| LED（綠 Power、藍 Wi-Fi、紅 Alert）+ 330Ω 電阻 | 3 組 |
+| 主動式蜂鳴器模組（3 腳：VCC / GND / I/O） | 1 |
+| WS2812B 8 燈燈條 + 330Ω 電阻（資料線用） | 1 |
 
 ### 接線
 
-```
-TCRT5000（上位）  VCC→3V3   GND→GND   DO→GPIO32
-TCRT5000（下位）  VCC→3V3   GND→GND   DO→GPIO33
+| ESP32 | 接到 |
+|---|---|
+| GPIO32 | 上位 TCRT5000 的 DO |
+| GPIO33 | 下位 TCRT5000 的 DO |
+| GPIO25 | 蜂鳴器模組的 I/O |
+| GPIO26 | 330Ω → WS2812B 的 DIN |
+| 3V3 | 兩個 TCRT5000 的 VCC、蜂鳴器模組 VCC |
+| VIN（5V） | WS2812B 的 5V |
+| GND | 所有零件的 GND |
 
-蜂鳴器：  5V → 蜂鳴器(+)，蜂鳴器(−) → 2N2222 集極(C)
-          GPIO25 → 1kΩ → 2N2222 基極(B)，射極(E) → GND
-
-Wi-Fi LED：  GPIO26 → 330Ω → LED → GND
-Alert LED：  GPIO27 → 330Ω → LED → GND
-Power LED：  3V3    → 330Ω → LED → GND
-```
-
+- TCRT5000 一定要接 3V3，接 5V 會讓訊號電壓超過 ESP32 可承受範圍
+- 蜂鳴器模組多為低電位觸發；若開機後一直響或完全不響，把程式中的 `BUZZER_ON` 改成 `HIGH`
+- 燈條第 1 顆顯示 Wi-Fi（青＝已連線、藍＝熱點模式、白色閃＝重連中），
+  第 2–8 顆是液量燈條（充足 7 顆綠、偏低 4 顆黃、耗盡 2 顆紅快閃、感測器異常紫色慢閃；靜音時停止閃爍）
 ## 使用方式
 
-1. 安裝 [Arduino IDE](https://www.arduino.cc/en/software)，於開發板管理員安裝 **esp32 by Espressif**（3.x 版）
+1. 安裝 [Arduino IDE](https://www.arduino.cc/en/software)，於開發板管理員安裝 **esp32 by Espressif**（3.x 版），程式庫管理員安裝 **Adafruit NeoPixel**
 2. 下載本專案，把 `secrets.example.h` 複製一份改名為 `secrets.h`，填入 Wi-Fi 與推播設定
 3. 開啟 `SmartIVDrip.ino`，開發板選 **ESP32 Dev Module**，上傳
 4. 打開序列埠監控視窗（115200），依顯示的網址用手機開啟監控網頁

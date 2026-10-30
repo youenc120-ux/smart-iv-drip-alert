@@ -12,13 +12,14 @@
  *   - 固定網址：http://<裝置名稱>.local（mDNS）
  *   - 網頁推播：ESP32 直接加密並送到 Apple / Google 推播服務，不經第三方通知平台
  *
- * 接線（對應「點滴注射預警系統電路原理圖」）：
- *   上位感測器（光電接收器集極，10kΩ 上拉）-> GPIO32
- *   下位感測器（光電接收器集極，10kΩ 上拉）-> GPIO33
- *   蜂鳴器：GPIO25 -> 1kΩ -> 2N2222 基極，3.3V 主動式蜂鳴器接集極
- *   Wi-Fi / 系統運作 LED：GPIO26 -> 330Ω -> LED -> GND
- *   Alert 警示 LED：GPIO27 -> 330Ω -> LED -> GND（原理圖未畫，對應外觀圖紅燈）
- *   Power LED：直接接 3.3V 經 330Ω 至 GND，不佔腳位
+ * 接線：
+ *   上位 TCRT5000 模組 DO -> GPIO32（VCC 接 3V3）
+ *   下位 TCRT5000 模組 DO -> GPIO33（VCC 接 3V3）
+ *   蜂鳴器模組 I/O -> GPIO25（VCC 接 3V3 或 5V，依模組規格）
+ *   WS2812B 8 燈燈條 DIN -> 330Ω -> GPIO26（5V 接 VIN）
+ *     第 1 顆：Wi-Fi 狀態；第 2–8 顆：液量燈條
+ *
+ * 需要程式庫：Adafruit NeoPixel（Arduino IDE 程式庫管理員搜尋安裝）
  */
 
 #include <WiFi.h>
@@ -26,6 +27,7 @@
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ESPmDNS.h>
+#include <Adafruit_NeoPixel.h>
 #include <Preferences.h>
 #include <time.h>
 #include <vector>
@@ -55,8 +57,15 @@ const int LIQUID_LEVEL = LOW;
 const int PIN_SENSOR_UPPER = 32;
 const int PIN_SENSOR_LOWER = 33;
 const int PIN_BUZZER       = 25;
-const int PIN_LED_WIFI     = 26;
-const int PIN_LED_ALERT    = 27;
+const int PIN_PIXELS       = 26;
+
+// 蜂鳴器模組多為「低電位觸發」（I/O 接 GND 才響）。開機後一直響或完全不響，就把這裡改成 HIGH
+const int BUZZER_ON = LOW;
+
+// WS2812B 燈條：第 0 顆顯示 Wi-Fi，其餘當液量燈條
+const int NUM_PIXELS     = 8;
+const int LED_BRIGHTNESS = 40;  // 0–255；8 顆全亮時電流不小，展示用 40 就夠亮
+Adafruit_NeoPixel pixels(NUM_PIXELS, PIN_PIXELS, NEO_GRB + NEO_KHZ800);
 
 const unsigned long DEBOUNCE_MS   = 1500;            // 液面晃動 / 氣泡濾除
 const unsigned long MUTE_STAGE1_MS = 5UL * 60 * 1000; // 第一階段靜音 5 分鐘
@@ -146,22 +155,45 @@ uint32_t nowEpoch() {
   return t >= 1700000000 ? (uint32_t)t : 0;
 }
 
-// ===== 輸出（LED / 蜂鳴器），非阻塞 =====
+// ===== 輸出（燈條 / 蜂鳴器），非阻塞 =====
+// 燈條：第 0 顆 = Wi-Fi（青＝已連線、藍＝熱點模式、白色閃＝斷線重連中）
+//       第 1–7 顆 = 液量：充足 7 顆綠、偏低 4 顆黃、耗盡 2 顆紅快閃、異常全部紫色慢閃
+// 靜音時改為恆亮不閃，現場一看就知道「已有人處理」
+void updatePixels(unsigned long now, bool muted) {
+  static uint32_t lastFrame[NUM_PIXELS];
+  uint32_t frame[NUM_PIXELS];
+  const int bar = NUM_PIXELS - 1;
+
+  bool wifiOk = apMode || WiFi.status() == WL_CONNECTED;
+  frame[0] = apMode ? pixels.Color(0, 0, 255)
+           : wifiOk ? pixels.Color(0, 200, 200)
+           : ((now / 400) % 2 ? pixels.Color(160, 160, 160) : 0);
+
+  uint32_t color = 0;
+  int lit = 0;
+  bool blink = false;
+  switch (state) {
+    case NORMAL:       color = pixels.Color(0, 220, 0);   lit = bar;           break;
+    case LOW_LEVEL:    color = pixels.Color(255, 140, 0); lit = (bar + 1) / 2; break;
+    case EMPTY:        color = pixels.Color(255, 0, 0);   lit = 2; blink = (now / 250) % 2;  break;
+    case SENSOR_FAULT: color = pixels.Color(150, 0, 255); lit = bar; blink = (now / 1000) % 2; break;
+  }
+  if (muted) blink = false;
+  for (int i = 0; i < bar; i++) frame[i + 1] = (i < lit && !blink) ? color : 0;
+
+  // 有變化才更新，避免頻繁送資料造成閃爍
+  if (memcmp(frame, lastFrame, sizeof(frame)) == 0) return;
+  memcpy(lastFrame, frame, sizeof(frame));
+  for (int i = 0; i < NUM_PIXELS; i++) pixels.setPixelColor(i, frame[i]);
+  pixels.show();
+}
+
 void updateOutputs(unsigned long now) {
   bool muted = now < mutedUntil;
   unsigned long t = now - stateSince;
   bool buzz = false;
 
-  // Wi-Fi 燈：已連線（或熱點模式）恆亮，斷線時閃爍
-  bool wifiOk = apMode || WiFi.status() == WL_CONNECTED;
-  digitalWrite(PIN_LED_WIFI, wifiOk || (now / 500) % 2);
-
-  // 警示燈：第一階段恆亮、第二階段快閃、感測器異常慢閃
-  bool alertLed = false;
-  if (state == LOW_LEVEL)    alertLed = true;
-  if (state == EMPTY)        alertLed = (now / 250) % 2;
-  if (state == SENSOR_FAULT) alertLed = (now / 1000) % 2;
-  digitalWrite(PIN_LED_ALERT, alertLed);
+  updatePixels(now, muted);
 
   switch (state) {
     case LOW_LEVEL:
@@ -176,7 +208,7 @@ void updateOutputs(unsigned long now) {
       break;
     default: break;
   }
-  digitalWrite(PIN_BUZZER, (buzz && !muted) ? HIGH : LOW);
+  digitalWrite(PIN_BUZZER, (buzz && !muted) ? BUZZER_ON : !BUZZER_ON);
 }
 
 String jsonEscape(const char* s) {
@@ -688,14 +720,21 @@ void setup() {
   Serial.begin(115200);
   pinMode(PIN_SENSOR_UPPER, INPUT);
   pinMode(PIN_SENSOR_LOWER, INPUT);
+  digitalWrite(PIN_BUZZER, !BUZZER_ON);  // 先設成不響，避免開機瞬間亂叫
   pinMode(PIN_BUZZER, OUTPUT);
-  pinMode(PIN_LED_WIFI, OUTPUT);
-  pinMode(PIN_LED_ALERT, OUTPUT);
+  pixels.begin();
+  pixels.setBrightness(LED_BRIGHTNESS);
 
-  // 開機自檢：雙燈 + 蜂鳴器短響
-  digitalWrite(PIN_LED_WIFI, HIGH); digitalWrite(PIN_LED_ALERT, HIGH);
-  digitalWrite(PIN_BUZZER, HIGH); delay(150); digitalWrite(PIN_BUZZER, LOW);
-  delay(350);
+  // 開機自檢：燈條彩虹掃過一次 + 蜂鳴器短響
+  for (int i = 0; i < NUM_PIXELS; i++) {
+    pixels.setPixelColor(i, pixels.ColorHSV(i * 65536L / NUM_PIXELS));
+    pixels.show();
+    delay(50);
+  }
+  digitalWrite(PIN_BUZZER, BUZZER_ON); delay(150); digitalWrite(PIN_BUZZER, !BUZZER_ON);
+  delay(300);
+  pixels.clear();
+  pixels.show();
 
   loadConfig();
   loadHistory();
