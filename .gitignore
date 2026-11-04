@@ -6,3 +6,6 @@ build/
 *.bin
 *.elf
 *.map
+
+# 打包給自己用的壓縮檔
+*.zip
