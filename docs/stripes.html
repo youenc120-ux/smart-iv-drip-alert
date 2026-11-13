@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>條紋背景卡</title>
+<style>
+/* 列印用：A4 直式，黑白橫條紋各 5 mm，放在點滴袋後面讓相機判斷液位 */
+@page { size: A4; margin: 10mm; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif; color: #16202c; background: #fff; }
+.note { padding: 16px; font-size: 15px; line-height: 1.6; }
+.note button { font: inherit; font-weight: 700; padding: 10px 20px; border: 0; border-radius: 10px; background: #1565c0; color: #fff; cursor: pointer; min-height: 44px; }
+.card { width: 190mm; height: 250mm; margin: 0 auto;
+  background: repeating-linear-gradient(to bottom, #000 0 5mm, #fff 5mm 10mm);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+@media print { .note { display: none; } }
+</style>
+</head>
+<body>
+<div class="note">
+  <p>列印這張條紋卡（A4，實際大小，不要縮放），剪下貼在點滴袋<b>後方</b>，條紋保持<b>水平</b>。<br>
+  相機從前面拍：有水的地方，條紋會被放大、扭曲，相機就能分辨液位。</p>
+  <button type="button" onclick="print()">列印</button>
+</div>
+<div class="card" role="img" aria-label="黑白橫條紋，各 5 公釐"></div>
+</body>
+</html>
