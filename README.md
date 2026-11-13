@@ -80,6 +80,17 @@
 每台裝置最多綁定 10 支手機，資料存在快閃記憶體，斷電不會消失。
 
 - **Telegram**（選用）：向 @BotFather 建立機器人取得 Token，填入 `secrets.h` 的 `TG_TOKEN` 與 `TG_CHAT_ID`
+## 相機影像偵測（選用，ESP32-CAM）
+
+透明點滴液用紅外線反射不易分辨時，可改用 [`IVCam/`](IVCam/) 相機節點：
+
+1. 把 `IVCam/secrets.example.h` 複製成 `IVCam/secrets.h`，填入相同的 Wi-Fi
+2. 開發板選「AI Thinker ESP32-CAM」燒錄 `IVCam/IVCam.ino`（需要 ESP32-CAM-MB 轉接板）
+3. 相機對準點滴袋並固定，袋子後面放黑白橫條紋卡；開 `http://iv-cam.local` 框出量測範圍，記錄「滿」與「空」
+4. 主控設定頁「感測方式」選「相機影像」，設定第一、二階段的液位百分比（預設 60%、20%）
+
+相機每 0.5 秒分析一次：計算範圍內每列平均亮度，與滿／空兩條校正曲線比對，找出液面位置，
+以亮度對數差比較，自動曝光造成的整體明暗變化不影響結果。監控頁會顯示「液位約 64%」。
 ## 手機 App
 
 [`app/`](app/) 資料夾是用 Flutter 撰寫的 Android / iOS 雙平台 App：多床同時監看、系統通知、

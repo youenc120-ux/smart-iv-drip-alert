@@ -275,7 +275,7 @@ const L = {
     eta_low: (d) => `預計${d}後耗盡`, eta_empty: (d) => `預計${d}後滴完`,
     src_measured: '依這袋實測滴速', src_set: '依醫囑滴速', src_last: '依上一袋實測滴速', perHour: (r) => `每小時約 ${r} ml`,
     replaced: (d) => `${d} 更換`, unknownTime: '時間未知', used: (d) => `這袋使用 ${d}`,
-    acked: (d) => `警報後 ${d}確認`, done: (d) => `警報後 ${d}完成更換`, sep: '・',
+    acked: (d) => `警報後 ${d}確認`, done: (d) => `警報後 ${d}完成更換`, sep: '・', levelPct: (l) => `液位約 ${l}%`,
   },
   en: {
     appName: 'IV Monitor', connecting: 'Connecting', connectingDots: 'Connecting…', live: 'Live', offline: 'Offline', hotspot: 'Hotspot',
@@ -297,7 +297,7 @@ const L = {
     etaUnknown: "Can't estimate time left", etaHint: 'Enter the prescribed rate in Settings', etaDone: 'Should be finished, act now',
     eta_low: (d) => `Empty in ${d}`, eta_empty: (d) => `Finishes in ${d}`,
     src_measured: "Based on this bag's measured rate", src_set: 'Based on the prescribed rate', src_last: "Based on the last bag's rate", perHour: (r) => `~${r} ml/h`,
-    replaced: (d) => `Replaced ${d}`, unknownTime: 'Time unknown', used: (d) => `Bag lasted ${d}`,
+    replaced: (d) => `Replaced ${d}`, unknownTime: 'Time unknown', used: (d) => `Bag lasted ${d}`, levelPct: (l) => `Level ~${l}%`,
     acked: (d) => `acknowledged ${d} after alert`, done: (d) => `replaced ${d} after alert`, sep: ' · ',
   },
 };
@@ -447,7 +447,9 @@ function render(d) {
   $('addr').textContent = d.ap ? t('hotspotAddr') : d.host ? d.host + '.local' : t('appName');
   setConn(true, d.rssi, d.ap);
   setHero(d.state);
-  $('since').textContent = fmt(d.since);
+  // 相機模式有實際液位百分比：點滴袋液面照比例畫（袋身 y=22～180）
+  if (d.level >= 0) $('liquid').style.transform = `translateY(${22 + (1 - d.level / 100) * 158 - 6}px)`;
+  $('since').textContent = (d.level >= 0 ? t('levelPct', d.level) + t('sep') : '') + fmt(d.since);
   renderEta(d);
   sensor('u', d.upper);
   sensor('l', d.lower);
@@ -504,7 +506,8 @@ function demoStatus() {
     bed: '', state: s,
     upper: s === 'normal' || s === 'fault', lower: s === 'normal' || s === 'low',
     muted, muteLeft: muted ? Math.ceil((demo.muteUntil - now) / 1000) : 0,
-    since, eta, rate: 100, rateSrc: 'set', rssi: -55, ap: false, push: 1, host: 'iv-monitor'
+    since, eta, rate: 100, rateSrc: 'set', rssi: -55, ap: false, push: 1, host: 'iv-monitor',
+    level: { normal: 85, low: 40, empty: 12 }[s] ?? -1
   };
 }
 

@@ -83,8 +83,32 @@ input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blu
     </div>
   </div>
 
-  <h2 data-i="secCal">感測器校正</h2>
+  <h2 data-i="secMode">感測方式</h2>
   <div class="card">
+    <div class="field">
+      <label class="check"><input type="radio" name="sensorMode" value="0" id="mode0"><span data-i="mode0">紅外線感測器（TCRT5000）</span></label>
+      <label class="check"><input type="radio" name="sensorMode" value="1" id="mode1"><span data-i="mode1">相機影像（ESP32-CAM）</span></label>
+    </div>
+    <div id="camFields">
+      <div class="field">
+        <label for="camHost" data-i="camHost">相機位址</label>
+        <div class="suffix"><span>http://</span><input id="camHost" name="camHost" autocapitalize="off" spellcheck="false" maxlength="40"></div>
+        <p class="help"><span id="camNow"></span> <a id="camLink" target="_blank" rel="noopener" data-i="camLink">開啟相機校正頁</a></p>
+      </div>
+      <div class="field">
+        <label for="camUpper" data-i="camUpper">第一階段：液位低於</label>
+        <div class="suffix"><input id="camUpper" name="camUpper" type="number" inputmode="numeric" min="2" max="99"><span>%</span></div>
+      </div>
+      <div class="field">
+        <label for="camLower" data-i="camLower">第二階段：液位低於</label>
+        <div class="suffix"><input id="camLower" name="camLower" type="number" inputmode="numeric" min="1" max="98"><span>%</span></div>
+        <p class="help" data-i="camHelp">相機校正（框範圍、記錄滿／空）在相機自己的頁面完成。</p>
+      </div>
+    </div>
+  </div>
+
+  <h2 data-i="secCal" id="calH">感測器校正</h2>
+  <div class="card" id="calCard">
     <div class="field sensorcal">
       <div class="calrow"><b data-i="upper">上位</b><span class="val" id="uVal">—</span><span class="pill" id="uJudge">—</span></div>
       <div class="bar" aria-hidden="true"><i id="uBar"></i><em class="mk wet" id="uW" hidden></em><em class="mk dry" id="uD" hidden></em></div>
@@ -187,6 +211,9 @@ const L = {
     clearPin: '取消配對碼', auth: '目前的配對碼', authHelp: '儲存設定前需要輸入。', save: '儲存設定',
     saved: '已儲存。', savedRestart: (h) => `已儲存。裝置正在重新開機，約 20 秒後請改用 http://${h}.local 開啟。`,
     netErr: '無法連線到裝置，請再試一次。', loadErr: '讀取設定失敗，請重新整理。',
+    secMode: '感測方式', mode0: '紅外線感測器（TCRT5000）', mode1: '相機影像（ESP32-CAM）', camHost: '相機位址', camLink: '開啟相機校正頁',
+    camUpper: '第一階段：液位低於', camLower: '第二階段：液位低於', camHelp: '相機校正（框範圍、記錄滿／空）在相機自己的頁面完成。',
+    camNow: (l) => l >= 0 ? `目前液位 ${l}%。` : '目前讀不到相機。',
     secCal: '感測器校正', upper: '上位', lower: '下位', liquid: '有液體', noLiquid: '無液體',
     legendWet: '有液體的記錄', legendDry: '沒液體的記錄',
     cal1: '上位、下位分開校正：感測器對著有水的位置時，按它下面的「記錄：有液體」。',
@@ -213,6 +240,9 @@ const L = {
     clearPin: 'Remove pairing code', auth: 'Current pairing code', authHelp: 'Required before saving.', save: 'Save settings',
     saved: 'Saved.', savedRestart: (h) => `Saved. The device is restarting; in about 20 s open http://${h}.local`,
     netErr: "Can't reach the device. Please try again.", loadErr: 'Could not load settings. Please refresh.',
+    secMode: 'Sensing method', mode0: 'Infrared sensors (TCRT5000)', mode1: 'Camera image (ESP32-CAM)', camHost: 'Camera address', camLink: 'Open camera calibration page',
+    camUpper: 'Stage 1: level below', camLower: 'Stage 2: level below', camHelp: 'Calibrate the camera (frame the area, record full/empty) on its own page.',
+    camNow: (l) => l >= 0 ? `Current level ${l}%.` : 'No data from the camera.',
     secCal: 'Sensor calibration', upper: 'Upper', lower: 'Lower', liquid: 'Liquid', noLiquid: 'No liquid',
     legendWet: 'Recorded with liquid', legendDry: 'Recorded without liquid',
     cal1: 'Calibrate the upper and lower sensors separately: when a sensor faces water, tap "Record: liquid" under it.',
@@ -232,7 +262,8 @@ const ERR_EN = {
   '需要配對碼': 'Pairing code required', '配對碼錯誤': 'Wrong pairing code', '錯誤次數太多，請 1 分鐘後再試': 'Too many attempts. Try again in 1 minute.',
   '床位名稱請輸入 1–20 個字': 'Bed name must be 1–20 characters', '裝置網址只能用小寫英文、數字和 -': 'Address may only use lowercase letters, digits and -',
   'Wi-Fi 名稱太長': 'Wi-Fi name is too long', '配對碼請設 4–8 位數字': 'Pairing code must be 4–8 digits', '配對碼只能用數字': 'Pairing code must be digits only',
-  '液量請輸入 1–2000 ml': 'Volume must be 1–2000 ml', '滴速請輸入 0–2000 ml/小時': 'Rate must be 0–2000 ml/h',
+  '液量請輸入 1–2000 ml': 'Volume must be 1–2000 ml', '請輸入相機位址': 'Enter the camera address',
+  '百分比請設 1–99，且第一階段要大於第二階段': 'Percentages must be 1–99, and stage 1 higher than stage 2', '滴速請輸入 0–2000 ml/小時': 'Rate must be 0–2000 ml/h',
 };
 let lang = (() => { try { return localStorage.getItem('lang'); } catch { return null; } })() || (/^zh/i.test(navigator.language) ? 'zh' : 'en');
 function t(k, ...a) { const v = L[lang][k] ?? L.zh[k] ?? k; return typeof v === 'function' ? v(...a) : v; }
@@ -253,6 +284,15 @@ function applyLang() {
   if (lastMsg) show(...lastMsg);
   if (lastRaw) renderRaw(lastRaw);
 }
+
+// 依感測方式顯示對應的設定
+function showMode() {
+  const cam = $('mode1').checked;
+  $('camFields').hidden = !cam;
+  $('calH').hidden = $('calCard').hidden = cam;
+  $('camLink').href = 'http://' + ($('camHost').value || 'iv-cam').replace(/\.local$/, '') + '.local/';
+}
+$('mode0').onchange = $('mode1').onchange = $('camHost').oninput = showMode;
 
 // ===== 感測器校正 =====
 let lastRaw = null, calNote = null;
@@ -288,6 +328,7 @@ function renderRaw(d) {
   else if (nu.ok && nl.ok) note = t('calAllOk');
   else note = t('calTips');
   $('calInfo').textContent = calNote ? `${calNote} ${note}` : note;
+  $('camNow').textContent = t('camNow', d.level);
 }
 async function pollRaw() {
   if (document.hidden) return;
@@ -315,7 +356,9 @@ $('langBtn').addEventListener('click', () => {
 
 async function load() {
   cfg = await (await fetch('/config', { cache: 'no-store' })).json();
-  for (const k of ['bed', 'host', 'ssid', 'rate', 'mlBetween', 'mlBelow']) $(k).value = cfg[k];
+  for (const k of ['bed', 'host', 'ssid', 'rate', 'mlBetween', 'mlBelow', 'camHost', 'camUpper', 'camLower']) $(k).value = cfg[k];
+  $('mode' + (cfg.sensorMode || 0)).checked = true;
+  showMode();
   $('authRow').hidden = $('clearRow').hidden = !cfg.pinSet;
   applyLang();
 }

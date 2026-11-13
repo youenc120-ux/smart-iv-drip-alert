@@ -110,6 +110,11 @@ struct Config {
   // 感測器校正值（TCRT5000 的 AO 類比讀值 0–4095），-1 = 尚未校正
   int wetU = -1, dryU = -1;    // 上位：有液體 / 沒液體時的讀值
   int wetL = -1, dryL = -1;    // 下位：有液體 / 沒液體時的讀值
+  // 感測方式：0 = TCRT5000 類比，1 = 相機節點（ESP32-CAM 回報液位百分比）
+  int sensorMode = 0;
+  String camHost = "iv-cam";   // 相機位址：主機名稱（不含 .local）或 IP
+  int camUpper = 60;           // 液位低於這個百分比 = 上位沒液體（第一階段）
+  int camLower = 20;           // 液位低於這個百分比 = 下位沒液體（第二階段）
 } cfg;
 
 // 去彈跳
@@ -180,7 +185,21 @@ bool judgeLiquid(int raw, int wet, int dry, bool prev) {
   return wetLow ? raw < mid - hys : raw > mid + hys;
 }
 
+// 相機節點回報的液位（由 camTask 更新）
+volatile int camLevel = -1;
+volatile unsigned long camOkAt = 0;
+
+bool camFresh() { return camOkAt && millis() - camOkAt < 10000; }
+
 bool readLiquid(const Debounced& s) {
+  if (cfg.sensorMode == 1) {
+    if (!camFresh()) {
+      // 開機 30 秒內相機可能還沒連上，先當作正常；之後仍沒有資料 = 上有液、下無液 → 感測器異常
+      return millis() < 30000 || s.pin == PIN_SENSOR_UPPER;
+    }
+    int thr = s.pin == PIN_SENSOR_UPPER ? cfg.camUpper : cfg.camLower;
+    return s.lastRaw ? camLevel >= thr - 2 : camLevel >= thr;  // 2% 遲滯，避免在門檻附近跳動
+  }
   return s.pin == PIN_SENSOR_UPPER ? judgeLiquid(rawU, cfg.wetU, cfg.dryU, s.lastRaw)
                                    : judgeLiquid(rawL, cfg.wetL, cfg.dryL, s.lastRaw);
 }
@@ -311,6 +330,10 @@ void loadConfig() {
   cfg.dryU      = prefs.getInt("dryU", -1);
   cfg.wetL      = prefs.getInt("wetL", -1);
   cfg.dryL      = prefs.getInt("dryL", -1);
+  cfg.sensorMode = prefs.getInt("mode", 0);
+  cfg.camHost   = prefs.getString("camHost", cfg.camHost);
+  cfg.camUpper  = prefs.getInt("camUpper", cfg.camUpper);
+  cfg.camLower  = prefs.getInt("camLower", cfg.camLower);
   prefs.end();
 }
 
@@ -328,6 +351,10 @@ void saveConfig() {
   prefs.putInt("dryU", cfg.dryU);
   prefs.putInt("wetL", cfg.wetL);
   prefs.putInt("dryL", cfg.dryL);
+  prefs.putInt("mode", cfg.sensorMode);
+  prefs.putString("camHost", cfg.camHost);
+  prefs.putInt("camUpper", cfg.camUpper);
+  prefs.putInt("camLower", cfg.camLower);
   prefs.end();
 }
 
@@ -479,6 +506,7 @@ void handleStatus() {
   json += "\"rateSrc\":\"" + String(src) + "\",";
   json += "\"push\":" + String((unsigned)subs.size()) + ",";
   json += "\"host\":\"" + jsonEscape(cfg.host) + "\",";
+  json += "\"level\":" + String(cfg.sensorMode == 1 && camFresh() ? camLevel : -1) + ",";
   json += "\"ap\":" + String(apMode ? "true" : "false") + ",";
   json += "\"rssi\":" + String(apMode ? 0 : WiFi.RSSI());
   json += "}";
@@ -565,6 +593,10 @@ void handleConfigGet() {
   json += "\"mlBelow\":" + String(cfg.mlBelow) + ",";
   json += "\"rate\":" + String(cfg.rateMlH) + ",";
   json += "\"lastRate\":" + String((int)(lastRate + 0.5f)) + ",";
+  json += "\"sensorMode\":" + String(cfg.sensorMode) + ",";
+  json += "\"camHost\":\"" + jsonEscape(cfg.camHost) + "\",";
+  json += "\"camUpper\":" + String(cfg.camUpper) + ",";
+  json += "\"camLower\":" + String(cfg.camLower) + ",";
   json += "\"ip\":\"" + (apMode ? WiFi.softAPIP() : WiFi.localIP()).toString() + "\",";
   json += "\"ap\":" + String(apMode ? "true" : "false");
   sendJson(json + "}");
@@ -591,6 +623,13 @@ void handleConfigPost() {
   for (char c : pin) if (!isdigit(c)) return replyJson(false, "配對碼只能用數字");
   if (mlBetween < 1 || mlBetween > 2000 || mlBelow < 1 || mlBelow > 2000) return replyJson(false, "液量請輸入 1–2000 ml");
   if (rate < 0 || rate > 2000) return replyJson(false, "滴速請輸入 0–2000 ml/小時");
+  int mode = server.arg("sensorMode").toInt(), camUpper = server.arg("camUpper").toInt(), camLower = server.arg("camLower").toInt();
+  String camHost = server.arg("camHost");
+  camHost.trim(); camHost.toLowerCase(); camHost.replace(".local", "");
+  if (mode == 1) {
+    if (!camHost.length() || camHost.length() > 40) return replyJson(false, "請輸入相機位址");
+    if (camLower < 1 || camUpper > 99 || camUpper <= camLower) return replyJson(false, "百分比請設 1–99，且第一階段要大於第二階段");
+  }
 
   bool netChanged = host != cfg.host || ssid != String(wifiSsid()) || server.arg("pass").length() > 0;
   cfg.bed = bed;
@@ -604,6 +643,8 @@ void handleConfigPost() {
   cfg.mlBetween = mlBetween;
   cfg.mlBelow = mlBelow;
   cfg.rateMlH = rate;
+  cfg.sensorMode = mode == 1 ? 1 : 0;
+  if (mode == 1) { cfg.camHost = camHost; cfg.camUpper = camUpper; cfg.camLower = camLower; }
   saveConfig();
   Serial.println("[設定] 已儲存");
 
@@ -618,7 +659,8 @@ void handleRaw() {
                 ",\"lLiq\":" + String(lower.lastRaw ? "true" : "false") +
                 ",\"wetU\":" + String(cfg.wetU) + ",\"dryU\":" + String(cfg.dryU) +
                 ",\"wetL\":" + String(cfg.wetL) + ",\"dryL\":" + String(cfg.dryL) +
-                ",\"minGap\":" + String(MIN_CAL_GAP) + "}";
+                ",\"minGap\":" + String(MIN_CAL_GAP) +
+                ",\"level\":" + String(camFresh() ? camLevel : -1) + "}";
   sendJson(json);
 }
 
@@ -802,6 +844,39 @@ void announce(DripState next, DripState prev, unsigned long now) {
   queueNotice(next, msg.c_str());
 }
 
+// ===== 相機節點 =====
+// 每秒向 ESP32-CAM 讀取液位；放在獨立工作，相機沒回應時不會卡住警報
+void camTask(void*) {
+  IPAddress cached;
+  int failures = 0;
+  for (;;) {
+    delay(1000);
+    if (cfg.sensorMode != 1 || apMode || WiFi.status() != WL_CONNECTED) continue;
+    String host = cfg.camHost;
+    host.replace(".local", "");
+    IPAddress target;
+    if (!target.fromString(host)) {
+      // 主機名稱：用 mDNS 查 IP，失敗幾次後重新查（相機重開機 IP 可能改變）
+      if (cached == IPAddress() || failures >= 3) { cached = MDNS.queryHost(host.c_str(), 1500); failures = 0; }
+      target = cached;
+    }
+    if (target == IPAddress()) { failures++; continue; }
+
+    WiFiClient client;
+    HTTPClient http;
+    http.setTimeout(1500);
+    int lv = -1;
+    if (http.begin(client, "http://" + target.toString() + "/level") && http.GET() == 200) {
+      String body = http.getString();
+      int i = body.indexOf("\"level\":");
+      if (i >= 0) lv = body.substring(i + 8).toInt();
+    }
+    http.end();
+    if (lv >= 0) { camLevel = lv; camOkAt = millis(); failures = 0; }
+    else failures++;
+  }
+}
+
 // ===== 無線更新（OTA）=====
 // 更新期間停止蜂鳴器，燈條以藍色顯示進度；完成後自動重新開機
 void setupOTA() {
@@ -899,6 +974,7 @@ void setup() {
   setupWiFi();
   noticeQueue = xQueueCreate(8, sizeof(Notice));
   xTaskCreate(notifyTask, "notify", 16384, nullptr, 1, nullptr);  // 加密 + TLS 需要較大堆疊
+  xTaskCreate(camTask, "cam", 6144, nullptr, 1, nullptr);
   if (state != NORMAL) announce(state, NORMAL, millis());  // 開機時就已偏低也要通知
 
   server.on("/", handleRoot);
