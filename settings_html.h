@@ -59,6 +59,8 @@ input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blu
 .wet{background:var(--ok)}.dry{background:var(--bad)}
 .dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
 .steps{padding-left:20px;margin:10px 0 0}
+.help.warn{color:var(--bad);font-weight:600}
+.sensorcal .two{margin-top:2px}
 .steps li{margin:4px 0}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
@@ -83,21 +85,31 @@ input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blu
 
   <h2 data-i="secCal">感測器校正</h2>
   <div class="card">
-    <div class="field">
+    <div class="field sensorcal">
       <div class="calrow"><b data-i="upper">上位</b><span class="val" id="uVal">—</span><span class="pill" id="uJudge">—</span></div>
       <div class="bar" aria-hidden="true"><i id="uBar"></i><em class="mk wet" id="uW" hidden></em><em class="mk dry" id="uD" hidden></em></div>
+      <div class="two">
+        <button class="btn soft" type="button" data-cal="wet" data-target="upper" data-i="calWet">記錄：有液體</button>
+        <button class="btn soft" type="button" data-cal="dry" data-target="upper" data-i="calDry">記錄：沒液體</button>
+      </div>
+      <p class="help" id="uInfo"></p>
+    </div>
+    <div class="field sensorcal">
       <div class="calrow"><b data-i="lower">下位</b><span class="val" id="lVal">—</span><span class="pill" id="lJudge">—</span></div>
       <div class="bar" aria-hidden="true"><i id="lBar"></i><em class="mk wet" id="lW" hidden></em><em class="mk dry" id="lD" hidden></em></div>
+      <div class="two">
+        <button class="btn soft" type="button" data-cal="wet" data-target="lower" data-i="calWet">記錄：有液體</button>
+        <button class="btn soft" type="button" data-cal="dry" data-target="lower" data-i="calDry">記錄：沒液體</button>
+      </div>
+      <p class="help" id="lInfo"></p>
+    </div>
+    <div class="field">
       <p class="help legend"><span class="dot wet"></span><span data-i="legendWet">有液體的記錄</span>　<span class="dot dry"></span><span data-i="legendDry">沒液體的記錄</span></p>
       <ol class="help steps">
-        <li data-i="cal1">點滴袋裝滿水，兩個感測器都對著有水的位置，按「記錄：有液體」。</li>
-        <li data-i="cal2">把水倒掉（或拿空袋子），按「記錄：沒液體」。</li>
-        <li data-i="cal3">倒水、加水測試，看上面的判定有沒有正確切換。袋子後面貼黑色膠帶，差距會更明顯。</li>
+        <li data-i="cal1">上位、下位分開校正：感測器對著有水的位置時，按它下面的「記錄：有液體」。</li>
+        <li data-i="cal2">感測器對著沒水的位置時（水倒掉，或水位降到感測器下方），按「記錄：沒液體」。</li>
+        <li data-i="cal3">每個感測器兩種都要記錄。之後加水、倒水測試，看判定有沒有正確切換。袋子後面貼黑色膠帶，差距會更明顯。</li>
       </ol>
-      <div class="two">
-        <button class="btn soft" type="button" id="calWet" data-i="calWet">記錄：有液體</button>
-        <button class="btn soft" type="button" id="calDry" data-i="calDry">記錄：沒液體</button>
-      </div>
       <p class="help" id="calInfo" role="status" aria-live="polite"></p>
     </div>
   </div>
@@ -177,10 +189,12 @@ const L = {
     netErr: '無法連線到裝置，請再試一次。', loadErr: '讀取設定失敗，請重新整理。',
     secCal: '感測器校正', upper: '上位', lower: '下位', liquid: '有液體', noLiquid: '無液體',
     legendWet: '有液體的記錄', legendDry: '沒液體的記錄',
-    cal1: '點滴袋裝滿水，兩個感測器都對著有水的位置，按「記錄：有液體」。',
-    cal2: '把水倒掉（或拿空袋子），按「記錄：沒液體」。',
-    cal3: '倒水、加水測試，看上面的判定有沒有正確切換。袋子後面貼黑色膠帶，差距會更明顯。',
-    calWet: '記錄：有液體', calDry: '記錄：沒液體', calSaved: '已記錄。',
+    cal1: '上位、下位分開校正：感測器對著有水的位置時，按它下面的「記錄：有液體」。',
+    cal2: '感測器對著沒水的位置時（水倒掉，或水位降到感測器下方），按「記錄：沒液體」。',
+    cal3: '每個感測器兩種都要記錄。之後加水、倒水測試，看判定有沒有正確切換。袋子後面貼黑色膠帶，差距會更明顯。',
+    calWet: '記錄：有液體', calDry: '記錄：沒液體', calSaved: '已記錄。', none: '未記錄', sep: '・',
+    recorded: (w, d) => `有液 ${w}／沒液 ${d}`, gapOk: (g) => `差距 ${g}，可以分辨`, gapWeak: (g, m) => `差距只有 ${g}（建議至少 ${m}）`,
+    calAllOk: '兩個感測器都校正完成，可以分辨有沒有液體。', calTips: '差距太小的感測器：請貼緊袋子、袋子後面貼黑色膠帶，再重新記錄。',
     calNone: '尚未校正，目前用預設值判斷，結果可能不準。',
     calHalf: '只記錄了一種情況，請把另一種也記錄完。',
     calGood: (u, l) => `差距：上位 ${u}、下位 ${l}，足夠分辨有沒有液體。`,
@@ -201,10 +215,12 @@ const L = {
     netErr: "Can't reach the device. Please try again.", loadErr: 'Could not load settings. Please refresh.',
     secCal: 'Sensor calibration', upper: 'Upper', lower: 'Lower', liquid: 'Liquid', noLiquid: 'No liquid',
     legendWet: 'Recorded with liquid', legendDry: 'Recorded without liquid',
-    cal1: 'Fill the IV bag with water so both sensors face liquid, then tap "Record: liquid".',
-    cal2: 'Empty the bag (or use an empty one), then tap "Record: no liquid".',
-    cal3: 'Add and remove water to check that the readings above switch correctly. Black tape behind the bag makes the difference larger.',
-    calWet: 'Record: liquid', calDry: 'Record: no liquid', calSaved: 'Recorded.',
+    cal1: 'Calibrate the upper and lower sensors separately: when a sensor faces water, tap "Record: liquid" under it.',
+    cal2: 'When a sensor faces no water (bag emptied, or the level is below the sensor), tap "Record: no liquid".',
+    cal3: 'Record both cases for each sensor, then add and remove water to check the result switches. Black tape behind the bag increases the difference.',
+    calWet: 'Record: liquid', calDry: 'Record: no liquid', calSaved: 'Recorded.', none: 'not set', sep: ' · ',
+    recorded: (w, d) => `Liquid ${w} / no liquid ${d}`, gapOk: (g) => `difference ${g}, OK`, gapWeak: (g, m) => `difference only ${g} (at least ${m} recommended)`,
+    calAllOk: 'Both sensors are calibrated and can tell liquid from air.', calTips: 'For a sensor with too small a difference: press it against the bag, add black tape behind the bag, then record again.',
     calNone: 'Not calibrated yet; default values are used and may be inaccurate.',
     calHalf: 'Only one case is recorded. Please record the other one too.',
     calGood: (u, l) => `Difference: upper ${u}, lower ${l}. Enough to tell liquid from air.`,
@@ -250,28 +266,35 @@ function renderSensor(p, v, liq, wet, dry) {
     $(id).style.left = (val / 4095 * 100) + '%';
   }
 }
+// 每個感測器顯示自己的記錄值與差距
+function sensorNote(name, wet, dry, gap) {
+  const rec = t('recorded', wet < 0 ? t('none') : wet, dry < 0 ? t('none') : dry);
+  if (wet < 0 || dry < 0) return { text: rec, ok: null };
+  const g = Math.abs(wet - dry);
+  return { text: `${rec}${t('sep')}${g >= gap ? t('gapOk', g) : t('gapWeak', g, gap)}`, ok: g >= gap };
+}
 function renderRaw(d) {
   lastRaw = d;
   renderSensor('u', d.u, d.uLiq, d.wetU, d.dryU);
   renderSensor('l', d.l, d.lLiq, d.wetL, d.dryL);
+  const nu = sensorNote(t('upper'), d.wetU, d.dryU, d.minGap), nl = sensorNote(t('lower'), d.wetL, d.dryL, d.minGap);
+  $('uInfo').textContent = nu.text;
+  $('lInfo').textContent = nl.text;
+  $('uInfo').className = 'help' + (nu.ok === false ? ' warn' : '');
+  $('lInfo').className = 'help' + (nl.ok === false ? ' warn' : '');
   let note;
-  const parts = [d.wetU, d.dryU, d.wetL, d.dryL];
-  if (parts.every((x) => x < 0)) note = t('calNone');
-  else if (parts.some((x) => x < 0)) note = t('calHalf');
-  else {
-    const gu = Math.abs(d.wetU - d.dryU), gl = Math.abs(d.wetL - d.dryL);
-    if (gu < d.minGap) note = t('calWeak', t('upper'), gu, d.minGap);
-    else if (gl < d.minGap) note = t('calWeak', t('lower'), gl, d.minGap);
-    else note = t('calGood', gu, gl);
-  }
+  if (nu.ok === null && nl.ok === null && [d.wetU, d.dryU, d.wetL, d.dryL].every((x) => x < 0)) note = t('calNone');
+  else if (nu.ok === null || nl.ok === null) note = t('calHalf');
+  else if (nu.ok && nl.ok) note = t('calAllOk');
+  else note = t('calTips');
   $('calInfo').textContent = calNote ? `${calNote} ${note}` : note;
 }
 async function pollRaw() {
   if (document.hidden) return;
   try { renderRaw(await (await fetch('/raw', { cache: 'no-store' })).json()); } catch {}
 }
-async function calibrate(which) {
-  const body = new URLSearchParams({ which, target: 'both', auth: $('auth').value });
+async function calibrate(which, target) {
+  const body = new URLSearchParams({ which, target, auth: $('auth').value });
   try {
     const d = await (await fetch('/calibrate', { method: 'POST', body })).json();
     calNote = d.ok ? t('calSaved') : tErr(d.error);
@@ -281,8 +304,7 @@ async function calibrate(which) {
   }
   pollRaw();
 }
-$('calWet').onclick = () => calibrate('wet');
-$('calDry').onclick = () => calibrate('dry');
+document.querySelectorAll('[data-cal]').forEach((b) => { b.onclick = () => calibrate(b.dataset.cal, b.dataset.target); });
 setInterval(pollRaw, 500);
 pollRaw();
 $('langBtn').addEventListener('click', () => {
