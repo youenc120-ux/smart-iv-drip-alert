@@ -60,7 +60,7 @@ const size_t MAX_HISTORY = 20;                           // 保留幾筆更換�
 // 並假設有液體時讀值較低（LIQUID_LEVEL = LOW）。
 const int LIQUID_LEVEL = LOW;
 const int MIN_CAL_GAP  = 150;  // 有液 / 無液讀值差距小於這個值，就提醒調整位置
-const int MIN_TOUCH_GAP = 30;  // 鋁箔觸控模式的最小差距（讀值已乘 10，等於觸控值差 3）
+const int MIN_TOUCH_GAP = 30;  // 鋁箔觸控模式的最小差距（實測後再調整）
 
 const int PIN_SENSOR_UPPER = 32;
 const int PIN_SENSOR_LOWER = 33;
@@ -158,18 +158,18 @@ unsigned long pinLockUntil = 0;
 // ===== 感測器（類比讀值 / 鋁箔觸控 + 校正）=====
 // sensorMode 0：TCRT5000 的 AO 類比值（0–4095）
 // sensorMode 2：鋁箔貼在點滴袋外，接 ESP32 觸控腳位；有水時電容變大，觸控讀值變小
-//               讀值乘 10 保留小數，範圍約 0–1000
+//               （Arduino core 3.x 的 touchRead 數值較大，取 0–8000）
 int rawU = 0, rawL = 0;  // 平滑後的讀值
 
 bool touchMode() { return cfg.sensorMode == 2; }
-int sensorMax() { return touchMode() ? 1000 : 4095; }
+int sensorMax() { return touchMode() ? 8000 : 4095; }
 int minGap() { return touchMode() ? MIN_TOUCH_GAP : MIN_CAL_GAP; }
 
 int readSensor(int pin) {
   long sum = 0;
   if (touchMode()) {
     for (int i = 0; i < 4; i++) sum += touchRead(pin);
-    return min(1000L, sum * 10 / 4);
+    return min((long)sensorMax(), sum / 4);
   }
   for (int i = 0; i < 16; i++) sum += analogRead(pin);
   return sum / 16;
