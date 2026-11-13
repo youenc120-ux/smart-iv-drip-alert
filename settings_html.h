@@ -87,7 +87,9 @@ input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blu
   <div class="card">
     <div class="field">
       <label class="check"><input type="radio" name="sensorMode" value="0" id="mode0"><span data-i="mode0">紅外線感測器（TCRT5000）</span></label>
+      <label class="check"><input type="radio" name="sensorMode" value="2" id="mode2"><span data-i="mode2">鋁箔（觸控感應）</span></label>
       <label class="check"><input type="radio" name="sensorMode" value="1" id="mode1"><span data-i="mode1">相機影像（ESP32-CAM）</span></label>
+      <p class="help" id="modeHelp"></p>
     </div>
     <div id="camFields">
       <div class="field">
@@ -211,7 +213,9 @@ const L = {
     clearPin: '取消配對碼', auth: '目前的配對碼', authHelp: '儲存設定前需要輸入。', save: '儲存設定',
     saved: '已儲存。', savedRestart: (h) => `已儲存。裝置正在重新開機，約 20 秒後請改用 http://${h}.local 開啟。`,
     netErr: '無法連線到裝置，請再試一次。', loadErr: '讀取設定失敗，請重新整理。',
-    secMode: '感測方式', mode0: '紅外線感測器（TCRT5000）', mode1: '相機影像（ESP32-CAM）', camHost: '相機位址', camLink: '開啟相機校正頁',
+    secMode: '感測方式', mode0: '紅外線感測器（TCRT5000）', mode1: '相機影像（ESP32-CAM）', mode2: '鋁箔（觸控感應）',
+    help0: '感測器 AO 接 GPIO32（上位）、GPIO33（下位）。', help1: '由 ESP32-CAM 拍照判斷液位百分比。',
+    help2: '點滴袋外貼兩片鋁箔，各用一條線直接接 GPIO32（上位）、GPIO33（下位）。有水時讀值會變小。切換方式後要重新校正。', camHost: '相機位址', camLink: '開啟相機校正頁',
     camUpper: '第一階段：液位低於', camLower: '第二階段：液位低於', camHelp: '相機校正（框範圍、記錄滿／空）在相機自己的頁面完成。',
     camNow: (l) => l >= 0 ? `目前液位 ${l}%。` : '目前讀不到相機。',
     secCal: '感測器校正', upper: '上位', lower: '下位', liquid: '有液體', noLiquid: '無液體',
@@ -240,7 +244,9 @@ const L = {
     clearPin: 'Remove pairing code', auth: 'Current pairing code', authHelp: 'Required before saving.', save: 'Save settings',
     saved: 'Saved.', savedRestart: (h) => `Saved. The device is restarting; in about 20 s open http://${h}.local`,
     netErr: "Can't reach the device. Please try again.", loadErr: 'Could not load settings. Please refresh.',
-    secMode: 'Sensing method', mode0: 'Infrared sensors (TCRT5000)', mode1: 'Camera image (ESP32-CAM)', camHost: 'Camera address', camLink: 'Open camera calibration page',
+    secMode: 'Sensing method', mode0: 'Infrared sensors (TCRT5000)', mode1: 'Camera image (ESP32-CAM)', mode2: 'Aluminium foil (touch sensing)',
+    help0: 'Sensor AO to GPIO32 (upper) and GPIO33 (lower).', help1: 'The ESP32-CAM estimates the level percentage from images.',
+    help2: 'Tape two pieces of foil on the outside of the bag and wire each straight to GPIO32 (upper) and GPIO33 (lower). Readings drop when water is behind the foil. Recalibrate after switching.', camHost: 'Camera address', camLink: 'Open camera calibration page',
     camUpper: 'Stage 1: level below', camLower: 'Stage 2: level below', camHelp: 'Calibrate the camera (frame the area, record full/empty) on its own page.',
     camNow: (l) => l >= 0 ? `Current level ${l}%.` : 'No data from the camera.',
     secCal: 'Sensor calibration', upper: 'Upper', lower: 'Lower', liquid: 'Liquid', noLiquid: 'No liquid',
@@ -283,27 +289,30 @@ function applyLang() {
   document.querySelectorAll('#nets button').forEach((b) => { b.textContent = b.dataset.ssid + (b.dataset.lock === '1' ? '' : t('open')); });
   if (lastMsg) show(...lastMsg);
   if (lastRaw) renderRaw(lastRaw);
+  if ($('modeHelp')) $('modeHelp').textContent = t('help' + curMode());
 }
 
 // 依感測方式顯示對應的設定
+function curMode() { return $('mode1').checked ? 1 : $('mode2').checked ? 2 : 0; }
 function showMode() {
   const cam = $('mode1').checked;
+  $('modeHelp').textContent = t('help' + curMode());
   $('camFields').hidden = !cam;
   $('calH').hidden = $('calCard').hidden = cam;
   $('camLink').href = 'http://' + ($('camHost').value || 'iv-cam').replace(/\.local$/, '') + '.local/';
 }
-$('mode0').onchange = $('mode1').onchange = $('camHost').oninput = showMode;
+$('mode0').onchange = $('mode1').onchange = $('mode2').onchange = $('camHost').oninput = showMode;
 
 // ===== 感測器校正 =====
 let lastRaw = null, calNote = null;
-function renderSensor(p, v, liq, wet, dry) {
+function renderSensor(p, v, liq, wet, dry, max) {
   $(p + 'Val').textContent = v;
-  $(p + 'Bar').style.width = (v / 4095 * 100) + '%';
+  $(p + 'Bar').style.width = Math.min(100, v / max * 100) + '%';
   $(p + 'Judge').textContent = liq ? t('liquid') : t('noLiquid');
   $(p + 'Judge').className = 'pill ' + (liq ? 'yes' : 'no');
   for (const [id, val] of [[p + 'W', wet], [p + 'D', dry]]) {
     $(id).hidden = val < 0;
-    $(id).style.left = (val / 4095 * 100) + '%';
+    $(id).style.left = Math.min(100, val / max * 100) + '%';
   }
 }
 // 每個感測器顯示自己的記錄值與差距
@@ -315,8 +324,8 @@ function sensorNote(name, wet, dry, gap) {
 }
 function renderRaw(d) {
   lastRaw = d;
-  renderSensor('u', d.u, d.uLiq, d.wetU, d.dryU);
-  renderSensor('l', d.l, d.lLiq, d.wetL, d.dryL);
+  renderSensor('u', d.u, d.uLiq, d.wetU, d.dryU, d.max || 4095);
+  renderSensor('l', d.l, d.lLiq, d.wetL, d.dryL, d.max || 4095);
   const nu = sensorNote(t('upper'), d.wetU, d.dryU, d.minGap), nl = sensorNote(t('lower'), d.wetL, d.dryL, d.minGap);
   $('uInfo').textContent = nu.text;
   $('lInfo').textContent = nl.text;

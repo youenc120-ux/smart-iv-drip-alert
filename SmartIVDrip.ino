@@ -60,6 +60,7 @@ const size_t MAX_HISTORY = 20;                           // 保留幾筆更換�
 // 並假設有液體時讀值較低（LIQUID_LEVEL = LOW）。
 const int LIQUID_LEVEL = LOW;
 const int MIN_CAL_GAP  = 150;  // 有液 / 無液讀值差距小於這個值，就提醒調整位置
+const int MIN_TOUCH_GAP = 30;  // 鋁箔觸控模式的最小差距（讀值已乘 10，等於觸控值差 3）
 
 const int PIN_SENSOR_UPPER = 32;
 const int PIN_SENSOR_LOWER = 33;
@@ -111,7 +112,7 @@ struct Config {
   int wetU = -1, dryU = -1;    // 上位：有液體 / 沒液體時的讀值
   int wetL = -1, dryL = -1;    // 下位：有液體 / 沒液體時的讀值
   // 感測方式：0 = TCRT5000 類比，1 = 相機節點（ESP32-CAM 回報液位百分比）
-  int sensorMode = 0;
+  int sensorMode = 0;          // 2 = 鋁箔觸控（GPIO32/33 是觸控腳位 T9/T8）
   String camHost = "iv-cam";   // 相機位址：主機名稱（不含 .local）或 IP
   int camUpper = 60;           // 液位低於這個百分比 = 上位沒液體（第一階段）
   int camLower = 20;           // 液位低於這個百分比 = 下位沒液體（第二階段）
@@ -154,11 +155,22 @@ float lastRate = 0;               // 上一袋實測滴速
 int pinFails = 0;
 unsigned long pinLockUntil = 0;
 
-// ===== 感測器（類比讀值 + 校正）=====
-int rawU = 0, rawL = 0;  // 平滑後的讀值 0–4095
+// ===== 感測器（類比讀值 / 鋁箔觸控 + 校正）=====
+// sensorMode 0：TCRT5000 的 AO 類比值（0–4095）
+// sensorMode 2：鋁箔貼在點滴袋外，接 ESP32 觸控腳位；有水時電容變大，觸控讀值變小
+//               讀值乘 10 保留小數，範圍約 0–1000
+int rawU = 0, rawL = 0;  // 平滑後的讀值
 
-int readAnalog(int pin) {
+bool touchMode() { return cfg.sensorMode == 2; }
+int sensorMax() { return touchMode() ? 1000 : 4095; }
+int minGap() { return touchMode() ? MIN_TOUCH_GAP : MIN_CAL_GAP; }
+
+int readSensor(int pin) {
   long sum = 0;
+  if (touchMode()) {
+    for (int i = 0; i < 4; i++) sum += touchRead(pin);
+    return min(1000L, sum * 10 / 4);
+  }
   for (int i = 0; i < 16; i++) sum += analogRead(pin);
   return sum / 16;
 }
@@ -168,16 +180,16 @@ void sampleSensors(unsigned long now, bool force = false) {
   static unsigned long last = 0;
   if (!force && now - last < 20) return;
   last = now;
-  int u = readAnalog(PIN_SENSOR_UPPER), l = readAnalog(PIN_SENSOR_LOWER);
+  int u = readSensor(PIN_SENSOR_UPPER), l = readSensor(PIN_SENSOR_LOWER);
   rawU = force ? u : (rawU * 3 + u) / 4;
   rawL = force ? l : (rawL * 3 + l) / 4;
 }
 
 // 依校正值判斷有沒有液體；中點加上遲滯，避免讀值在邊界附近時跳來跳去
 bool judgeLiquid(int raw, int wet, int dry, bool prev) {
-  if (wet < 0 || dry < 0) {  // 尚未校正
-    wet = LIQUID_LEVEL == LOW ? 0 : 4095;
-    dry = 4095 - wet;
+  if (wet < 0 || dry < 0) {  // 尚未校正：觸控模式有水時讀值較小；類比模式依 LIQUID_LEVEL
+    wet = touchMode() || LIQUID_LEVEL == LOW ? 0 : sensorMax();
+    dry = sensorMax() - wet;
   }
   int mid = (wet + dry) / 2, hys = abs(wet - dry) / 10;
   bool wetLow = wet < dry;
@@ -643,7 +655,10 @@ void handleConfigPost() {
   cfg.mlBetween = mlBetween;
   cfg.mlBelow = mlBelow;
   cfg.rateMlH = rate;
-  cfg.sensorMode = mode == 1 ? 1 : 0;
+  int newMode = mode == 1 || mode == 2 ? mode : 0;
+  // 類比與觸控的讀值範圍不同，切換時舊的校正值作廢
+  if ((newMode == 2) != (cfg.sensorMode == 2) && newMode != 1) cfg.wetU = cfg.dryU = cfg.wetL = cfg.dryL = -1;
+  cfg.sensorMode = newMode;
   if (mode == 1) { cfg.camHost = camHost; cfg.camUpper = camUpper; cfg.camLower = camLower; }
   saveConfig();
   Serial.println("[設定] 已儲存");
@@ -659,7 +674,8 @@ void handleRaw() {
                 ",\"lLiq\":" + String(lower.lastRaw ? "true" : "false") +
                 ",\"wetU\":" + String(cfg.wetU) + ",\"dryU\":" + String(cfg.dryU) +
                 ",\"wetL\":" + String(cfg.wetL) + ",\"dryL\":" + String(cfg.dryL) +
-                ",\"minGap\":" + String(MIN_CAL_GAP) +
+                ",\"minGap\":" + String(minGap()) + ",\"max\":" + String(sensorMax()) +
+                ",\"mode\":" + String(cfg.sensorMode) +
                 ",\"level\":" + String(camFresh() ? camLevel : -1) + "}";
   sendJson(json);
 }
