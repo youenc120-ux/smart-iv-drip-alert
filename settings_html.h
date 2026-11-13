@@ -47,6 +47,21 @@ input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blu
 .msg{margin:14px 4px 0;font-size:15px;font-weight:600}
 .msg.ok{color:var(--ok)}.msg.err{color:var(--bad)}
 .msg:empty{display:none}
+.calrow{display:flex;align-items:center;gap:10px;margin-top:4px}
+.calrow b{flex:1;font-size:15px}
+.val{font-variant-numeric:tabular-nums;color:var(--sub);font-size:14px}
+.pill{font-size:13px;font-weight:700;padding:2px 10px;border-radius:999px;background:var(--line);color:var(--sub);min-width:64px;text-align:center}
+.pill.yes{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.pill.no{background:color-mix(in srgb,var(--bad) 15%,transparent);color:var(--bad)}
+.bar{position:relative;height:10px;border-radius:5px;background:var(--line);margin:8px 0 14px}
+.bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:var(--blue);transition:width .3s}
+.mk{position:absolute;top:-4px;width:4px;height:18px;margin-left:-2px;border-radius:2px}
+.wet{background:var(--ok)}.dry{background:var(--bad)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.steps{padding-left:20px;margin:10px 0 0}
+.steps li{margin:4px 0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
 [hidden]{display:none!important}
 :focus-visible{outline:3px solid var(--blue);outline-offset:2px}
 </style></head><body>
@@ -63,6 +78,27 @@ input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px var(--blu
       <label for="bed" data-i="bed">床位名稱</label>
       <input id="bed" name="bed" maxlength="20" required data-ph="bedPh" placeholder="301 病房 A 床">
       <p class="help" data-i="bedHelp">會顯示在監控頁和推播通知上。</p>
+    </div>
+  </div>
+
+  <h2 data-i="secCal">感測器校正</h2>
+  <div class="card">
+    <div class="field">
+      <div class="calrow"><b data-i="upper">上位</b><span class="val" id="uVal">—</span><span class="pill" id="uJudge">—</span></div>
+      <div class="bar" aria-hidden="true"><i id="uBar"></i><em class="mk wet" id="uW" hidden></em><em class="mk dry" id="uD" hidden></em></div>
+      <div class="calrow"><b data-i="lower">下位</b><span class="val" id="lVal">—</span><span class="pill" id="lJudge">—</span></div>
+      <div class="bar" aria-hidden="true"><i id="lBar"></i><em class="mk wet" id="lW" hidden></em><em class="mk dry" id="lD" hidden></em></div>
+      <p class="help legend"><span class="dot wet"></span><span data-i="legendWet">有液體的記錄</span>　<span class="dot dry"></span><span data-i="legendDry">沒液體的記錄</span></p>
+      <ol class="help steps">
+        <li data-i="cal1">點滴袋裝滿水，兩個感測器都對著有水的位置，按「記錄：有液體」。</li>
+        <li data-i="cal2">把水倒掉（或拿空袋子），按「記錄：沒液體」。</li>
+        <li data-i="cal3">倒水、加水測試，看上面的判定有沒有正確切換。袋子後面貼黑色膠帶，差距會更明顯。</li>
+      </ol>
+      <div class="two">
+        <button class="btn soft" type="button" id="calWet" data-i="calWet">記錄：有液體</button>
+        <button class="btn soft" type="button" id="calDry" data-i="calDry">記錄：沒液體</button>
+      </div>
+      <p class="help" id="calInfo" role="status" aria-live="polite"></p>
     </div>
   </div>
 
@@ -139,6 +175,16 @@ const L = {
     clearPin: '取消配對碼', auth: '目前的配對碼', authHelp: '儲存設定前需要輸入。', save: '儲存設定',
     saved: '已儲存。', savedRestart: (h) => `已儲存。裝置正在重新開機，約 20 秒後請改用 http://${h}.local 開啟。`,
     netErr: '無法連線到裝置，請再試一次。', loadErr: '讀取設定失敗，請重新整理。',
+    secCal: '感測器校正', upper: '上位', lower: '下位', liquid: '有液體', noLiquid: '無液體',
+    legendWet: '有液體的記錄', legendDry: '沒液體的記錄',
+    cal1: '點滴袋裝滿水，兩個感測器都對著有水的位置，按「記錄：有液體」。',
+    cal2: '把水倒掉（或拿空袋子），按「記錄：沒液體」。',
+    cal3: '倒水、加水測試，看上面的判定有沒有正確切換。袋子後面貼黑色膠帶，差距會更明顯。',
+    calWet: '記錄：有液體', calDry: '記錄：沒液體', calSaved: '已記錄。',
+    calNone: '尚未校正，目前用預設值判斷，結果可能不準。',
+    calHalf: '只記錄了一種情況，請把另一種也記錄完。',
+    calGood: (u, l) => `差距：上位 ${u}、下位 ${l}，足夠分辨有沒有液體。`,
+    calWeak: (n, g, m) => `${n}的差距只有 ${g}（建議至少 ${m}）：請把感測器貼緊袋子、袋子後面貼黑色膠帶，再重新校正。`,
   },
   en: {
     back: 'Monitor', title: 'Device settings', secBed: 'Bed', bed: 'Bed name', bedPh: 'Room 301 Bed A', bedHelp: 'Shown on the monitor page and in alerts.',
@@ -153,6 +199,16 @@ const L = {
     clearPin: 'Remove pairing code', auth: 'Current pairing code', authHelp: 'Required before saving.', save: 'Save settings',
     saved: 'Saved.', savedRestart: (h) => `Saved. The device is restarting; in about 20 s open http://${h}.local`,
     netErr: "Can't reach the device. Please try again.", loadErr: 'Could not load settings. Please refresh.',
+    secCal: 'Sensor calibration', upper: 'Upper', lower: 'Lower', liquid: 'Liquid', noLiquid: 'No liquid',
+    legendWet: 'Recorded with liquid', legendDry: 'Recorded without liquid',
+    cal1: 'Fill the IV bag with water so both sensors face liquid, then tap "Record: liquid".',
+    cal2: 'Empty the bag (or use an empty one), then tap "Record: no liquid".',
+    cal3: 'Add and remove water to check that the readings above switch correctly. Black tape behind the bag makes the difference larger.',
+    calWet: 'Record: liquid', calDry: 'Record: no liquid', calSaved: 'Recorded.',
+    calNone: 'Not calibrated yet; default values are used and may be inaccurate.',
+    calHalf: 'Only one case is recorded. Please record the other one too.',
+    calGood: (u, l) => `Difference: upper ${u}, lower ${l}. Enough to tell liquid from air.`,
+    calWeak: (n, g, m) => `The ${n.toLowerCase()} sensor differs by only ${g} (at least ${m} recommended). Press the sensor against the bag, add black tape behind it, and calibrate again.`,
   },
 };
 // 裝置回傳的中文錯誤訊息
@@ -179,7 +235,56 @@ function applyLang() {
   if (scanned) $('scanBtn').textContent = t('rescan');
   document.querySelectorAll('#nets button').forEach((b) => { b.textContent = b.dataset.ssid + (b.dataset.lock === '1' ? '' : t('open')); });
   if (lastMsg) show(...lastMsg);
+  if (lastRaw) renderRaw(lastRaw);
 }
+
+// ===== 感測器校正 =====
+let lastRaw = null, calNote = null;
+function renderSensor(p, v, liq, wet, dry) {
+  $(p + 'Val').textContent = v;
+  $(p + 'Bar').style.width = (v / 4095 * 100) + '%';
+  $(p + 'Judge').textContent = liq ? t('liquid') : t('noLiquid');
+  $(p + 'Judge').className = 'pill ' + (liq ? 'yes' : 'no');
+  for (const [id, val] of [[p + 'W', wet], [p + 'D', dry]]) {
+    $(id).hidden = val < 0;
+    $(id).style.left = (val / 4095 * 100) + '%';
+  }
+}
+function renderRaw(d) {
+  lastRaw = d;
+  renderSensor('u', d.u, d.uLiq, d.wetU, d.dryU);
+  renderSensor('l', d.l, d.lLiq, d.wetL, d.dryL);
+  let note;
+  const parts = [d.wetU, d.dryU, d.wetL, d.dryL];
+  if (parts.every((x) => x < 0)) note = t('calNone');
+  else if (parts.some((x) => x < 0)) note = t('calHalf');
+  else {
+    const gu = Math.abs(d.wetU - d.dryU), gl = Math.abs(d.wetL - d.dryL);
+    if (gu < d.minGap) note = t('calWeak', t('upper'), gu, d.minGap);
+    else if (gl < d.minGap) note = t('calWeak', t('lower'), gl, d.minGap);
+    else note = t('calGood', gu, gl);
+  }
+  $('calInfo').textContent = calNote ? `${calNote} ${note}` : note;
+}
+async function pollRaw() {
+  if (document.hidden) return;
+  try { renderRaw(await (await fetch('/raw', { cache: 'no-store' })).json()); } catch {}
+}
+async function calibrate(which) {
+  const body = new URLSearchParams({ which, target: 'both', auth: $('auth').value });
+  try {
+    const d = await (await fetch('/calibrate', { method: 'POST', body })).json();
+    calNote = d.ok ? t('calSaved') : tErr(d.error);
+    if (d.needPin) $('auth').focus();
+  } catch {
+    calNote = t('netErr');
+  }
+  pollRaw();
+}
+$('calWet').onclick = () => calibrate('wet');
+$('calDry').onclick = () => calibrate('dry');
+setInterval(pollRaw, 500);
+pollRaw();
 $('langBtn').addEventListener('click', () => {
   lang = lang === 'zh' ? 'en' : 'zh';
   try { localStorage.setItem('lang', lang); } catch {}

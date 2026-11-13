@@ -16,8 +16,9 @@
  *   - 網頁推播：ESP32 直接加密並送到 Apple / Google 推播服務，不經第三方通知平台
  *
  * 接線：
- *   上位 TCRT5000 模組 DO -> GPIO32（VCC 接 3V3）
- *   下位 TCRT5000 模組 DO -> GPIO33（VCC 接 3V3）
+ *   上位 TCRT5000 模組 AO -> GPIO32（VCC 接 3V3，DO 不接）
+ *   下位 TCRT5000 模組 AO -> GPIO33（VCC 接 3V3，DO 不接）
+ *     讀類比值，在設定頁「感測器校正」記錄有液 / 無液的讀值
  *   蜂鳴器模組 I/O -> GPIO25（VCC 接 3V3 或 5V，依模組規格）
  *   WS2812B 8 燈燈條 DIN -> 330Ω -> GPIO26（5V 接 VIN）
  *     第 1 顆：Wi-Fi 狀態；第 2–8 顆：液量燈條
@@ -54,10 +55,11 @@ const unsigned long REPEAT_EMPTY_MS = 2UL * 60 * 1000;  // 第二階段未處理
 const size_t MAX_SUBS    = 10;                           // 最多綁定幾支手機
 const size_t MAX_HISTORY = 20;                           // 保留幾筆更換紀錄
 
-// 感測器偵測到液體時的輸出電位。
-// 反射式：光電晶體收到較強反射光時導通 -> 輸出 LOW。
-// 有液 / 無液哪一種反射較強要看點滴袋與安裝角度，請實測後設定。
+// 感測器接 TCRT5000 模組的 AO（類比輸出），反射越強讀值越低。
+// 有液 / 無液的讀值在設定頁「感測器校正」記錄；尚未校正時，暫時以中間值 2048 判斷，
+// 並假設有液體時讀值較低（LIQUID_LEVEL = LOW）。
 const int LIQUID_LEVEL = LOW;
+const int MIN_CAL_GAP  = 150;  // 有液 / 無液讀值差距小於這個值，就提醒調整位置
 
 const int PIN_SENSOR_UPPER = 32;
 const int PIN_SENSOR_LOWER = 33;
@@ -105,6 +107,9 @@ struct Config {
   int mlBetween = 100;         // 上位到下位之間的液量（ml）
   int mlBelow = 50;            // 下位以下的剩餘液量（ml）
   int rateMlH = 0;             // 醫囑滴速（ml/小時），0 = 未設定
+  // 感測器校正值（TCRT5000 的 AO 類比讀值 0–4095），-1 = 尚未校正
+  int wetU = -1, dryU = -1;    // 上位：有液體 / 沒液體時的讀值
+  int wetL = -1, dryL = -1;    // 下位：有液體 / 沒液體時的讀值
 } cfg;
 
 // 去彈跳
@@ -144,10 +149,44 @@ float lastRate = 0;               // 上一袋實測滴速
 int pinFails = 0;
 unsigned long pinLockUntil = 0;
 
-bool readLiquid(int pin) { return digitalRead(pin) == LIQUID_LEVEL; }
+// ===== 感測器（類比讀值 + 校正）=====
+int rawU = 0, rawL = 0;  // 平滑後的讀值 0–4095
+
+int readAnalog(int pin) {
+  long sum = 0;
+  for (int i = 0; i < 16; i++) sum += analogRead(pin);
+  return sum / 16;
+}
+
+// 每 20ms 取樣一次，指數平滑濾掉雜訊
+void sampleSensors(unsigned long now, bool force = false) {
+  static unsigned long last = 0;
+  if (!force && now - last < 20) return;
+  last = now;
+  int u = readAnalog(PIN_SENSOR_UPPER), l = readAnalog(PIN_SENSOR_LOWER);
+  rawU = force ? u : (rawU * 3 + u) / 4;
+  rawL = force ? l : (rawL * 3 + l) / 4;
+}
+
+// 依校正值判斷有沒有液體；中點加上遲滯，避免讀值在邊界附近時跳來跳去
+bool judgeLiquid(int raw, int wet, int dry, bool prev) {
+  if (wet < 0 || dry < 0) {  // 尚未校正
+    wet = LIQUID_LEVEL == LOW ? 0 : 4095;
+    dry = 4095 - wet;
+  }
+  int mid = (wet + dry) / 2, hys = abs(wet - dry) / 10;
+  bool wetLow = wet < dry;
+  if (prev) return wetLow ? raw < mid + hys : raw > mid - hys;
+  return wetLow ? raw < mid - hys : raw > mid + hys;
+}
+
+bool readLiquid(const Debounced& s) {
+  return s.pin == PIN_SENSOR_UPPER ? judgeLiquid(rawU, cfg.wetU, cfg.dryU, s.lastRaw)
+                                   : judgeLiquid(rawL, cfg.wetL, cfg.dryL, s.lastRaw);
+}
 
 void updateDebounce(Debounced& s, unsigned long now) {
-  bool raw = readLiquid(s.pin);
+  bool raw = readLiquid(s);
   if (raw != s.lastRaw) { s.lastRaw = raw; s.changedAt = now; }
   if (raw != s.stable && now - s.changedAt >= DEBOUNCE_MS) s.stable = raw;
 }
@@ -268,6 +307,10 @@ void loadConfig() {
   cfg.mlBetween = prefs.getInt("mlBetween", cfg.mlBetween);
   cfg.mlBelow   = prefs.getInt("mlBelow", cfg.mlBelow);
   cfg.rateMlH   = prefs.getInt("rate", cfg.rateMlH);
+  cfg.wetU      = prefs.getInt("wetU", -1);
+  cfg.dryU      = prefs.getInt("dryU", -1);
+  cfg.wetL      = prefs.getInt("wetL", -1);
+  cfg.dryL      = prefs.getInt("dryL", -1);
   prefs.end();
 }
 
@@ -281,6 +324,10 @@ void saveConfig() {
   prefs.putInt("mlBetween", cfg.mlBetween);
   prefs.putInt("mlBelow", cfg.mlBelow);
   prefs.putInt("rate", cfg.rateMlH);
+  prefs.putInt("wetU", cfg.wetU);
+  prefs.putInt("dryU", cfg.dryU);
+  prefs.putInt("wetL", cfg.wetL);
+  prefs.putInt("dryL", cfg.dryL);
   prefs.end();
 }
 
@@ -564,6 +611,36 @@ void handleConfigPost() {
   sendJson(String("{\"ok\":true,\"restart\":") + (netChanged ? "true" : "false") + "}");
 }
 
+// 感測器即時讀值與校正狀態（設定頁每 0.5 秒讀一次）
+void handleRaw() {
+  String json = "{\"u\":" + String(rawU) + ",\"l\":" + String(rawL) +
+                ",\"uLiq\":" + String(upper.lastRaw ? "true" : "false") +
+                ",\"lLiq\":" + String(lower.lastRaw ? "true" : "false") +
+                ",\"wetU\":" + String(cfg.wetU) + ",\"dryU\":" + String(cfg.dryU) +
+                ",\"wetL\":" + String(cfg.wetL) + ",\"dryL\":" + String(cfg.dryL) +
+                ",\"minGap\":" + String(MIN_CAL_GAP) + "}";
+  sendJson(json);
+}
+
+// 記錄目前讀值為「有液體」或「沒液體」；target = both / upper / lower
+void handleCalibrate() {
+  if (const char* err = checkPin(server.arg("auth"))) return replyJson(false, err, true);
+  String which = server.arg("which"), target = server.arg("target");
+  if (which != "wet" && which != "dry") return replyJson(false, "參數錯誤");
+  bool doU = target != "lower", doL = target != "upper";
+  if (which == "wet") {
+    if (doU) cfg.wetU = rawU;
+    if (doL) cfg.wetL = rawL;
+  } else {
+    if (doU) cfg.dryU = rawU;
+    if (doL) cfg.dryL = rawL;
+  }
+  if (server.arg("reset") == "1") cfg.wetU = cfg.dryU = cfg.wetL = cfg.dryL = -1;
+  saveConfig();
+  Serial.printf("[校正] 上位 有液=%d 無液=%d；下位 有液=%d 無液=%d\n", cfg.wetU, cfg.dryU, cfg.wetL, cfg.dryL);
+  replyJson(true, nullptr);
+}
+
 // 非同步掃描附近 Wi-Fi，避免卡住警報
 void handleScan() {
   int n = WiFi.scanComplete();
@@ -804,8 +881,10 @@ void setup() {
   loadConfig();
   loadHistory();
 
-  upper.stable = upper.lastRaw = readLiquid(PIN_SENSOR_UPPER);
-  lower.stable = lower.lastRaw = readLiquid(PIN_SENSOR_LOWER);
+  analogReadResolution(12);
+  sampleSensors(millis(), true);
+  upper.stable = upper.lastRaw = readLiquid(upper);
+  lower.stable = lower.lastRaw = readLiquid(lower);
   state = evaluate();
   stateSince = millis();
   if (state == LOW_LEVEL || state == EMPTY) cur = { lastDoneAt, 0, 0, 0, 0 };
@@ -834,6 +913,8 @@ void setup() {
   server.on("/config", HTTP_GET, handleConfigGet);
   server.on("/config", HTTP_POST, handleConfigPost);
   server.on("/scan", handleScan);
+  server.on("/raw", handleRaw);
+  server.on("/calibrate", HTTP_POST, handleCalibrate);
   httpUpdater.setup(&server, "/update", "admin", OTA_PASS);  // 網頁無線更新
   server.begin();
 }
@@ -844,6 +925,7 @@ void loop() {
   if (otaRunning) return;  // 更新中只處理 OTA，避免寫入快閃記憶體時被打斷
   server.handleClient();
 
+  sampleSensors(now);
   updateDebounce(upper, now);
   updateDebounce(lower, now);
 
@@ -868,14 +950,12 @@ void loop() {
 
   updateOutputs(now);
 
-  // 校正用：每秒印出感測器原始電位，裝好後對照「有液 / 無液」決定 LIQUID_LEVEL
+  // 每秒印出感測器讀值，方便對照設定頁的校正
   static unsigned long lastPrint = 0;
   if (now - lastPrint > 1000) {
     lastPrint = now;
-    Serial.printf("上位=%s 下位=%s 狀態=%s\n",
-                  digitalRead(PIN_SENSOR_UPPER) ? "HIGH" : "LOW",
-                  digitalRead(PIN_SENSOR_LOWER) ? "HIGH" : "LOW",
-                  STATE_TEXT[state]);
+    Serial.printf("上位=%d(%s) 下位=%d(%s) 狀態=%s\n", rawU, upper.stable ? "有液" : "無液",
+                  rawL, lower.stable ? "有液" : "無液", STATE_TEXT[state]);
   }
 
   // Wi-Fi 斷線自動重連
